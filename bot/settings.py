@@ -411,7 +411,7 @@ class SettingsHandler:
         
         return MAIN_MENU
     
-    async async def _test_connection(self, update: Update, context: CallbackContext):
+    async def _test_connection(self, update: Update, context: CallbackContext):
         """Test MT5 connection"""
         user_id = context.user_data['settings_user_id']
         
@@ -430,7 +430,7 @@ class SettingsHandler:
                 text=f"❌ Connection test failed: {str(e)[:100]}"
             )
     
-    async async def _update_credentials(self, update: Update, context: CallbackContext,
+    async def _update_credentials(self, update: Update, context: CallbackContext,
                                   account: str, password: str, server: str):
         """Update MT5 credentials"""
         user_id = context.user_data['settings_user_id']

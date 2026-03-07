@@ -139,7 +139,7 @@ class TradingHandler:
         else:
             return self._process_calculation(update, context)
     
-    async async def _process_trade(self, update: Update, context: CallbackContext) -> int:
+    async def _process_trade(self, update: Update, context: CallbackContext) -> int:
         """Process a trade signal for execution"""
         user_id = update.effective_user.id
         signal_text = context.user_data['signal_text']
@@ -200,7 +200,7 @@ class TradingHandler:
             # Remove from active
             self.active_trades.pop(user_id, None)
     
-    async async def _process_calculation(self, update: Update, context: CallbackContext) -> int:
+    async def _process_calculation(self, update: Update, context: CallbackContext) -> int:
         """Process a calculation request"""
         user_id = update.effective_user.id
         signal_text = context.user_data['signal_text']
@@ -276,7 +276,7 @@ class TradingHandler:
             )
             return ENTER_TRADE
     
-    async async def _execute_trade(self, update: Update, context: CallbackContext) -> int:
+    async def _execute_trade(self, update: Update, context: CallbackContext) -> int:
         """Execute the confirmed trade"""
         user_id = update.effective_user.id
         calculation = context.user_data.get('calculation')
@@ -368,7 +368,7 @@ class TradingHandler:
             )
             return ADJUST_RISK
     
-    async async def handle_action(self, update: Update, context: CallbackContext) -> None:
+    async def handle_action(self, update: Update, context: CallbackContext) -> None:
         """Handle simple actions (balance, positions)"""
         user_id = update.effective_user.id
         action = context.user_data.get('action')
@@ -397,7 +397,7 @@ class TradingHandler:
         
         context.user_data.clear()
     
-    async async def _edit_message(self, update: Update, context: CallbackContext, 
+    async def _edit_message(self, update: Update, context: CallbackContext, 
                            text: str, **kwargs):
         """Edit the processing message or send new one"""
         msg_id = context.user_data.get('processing_msg_id')
