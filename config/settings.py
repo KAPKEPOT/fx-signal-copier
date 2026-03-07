@@ -63,6 +63,10 @@ class Settings(BaseSettings):
         if v is None:
             return []
         if isinstance(v, str):
+            # Strip inline comments before any parsing
+            v = v.split('#')[0].strip()
+            if not v:
+            	return []
             # Try to parse as JSON first
             try:
                 return json.loads(v)
