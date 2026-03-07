@@ -1,4 +1,4 @@
-# fx/database/migrations/001_initial_migration.py
+# fx/database/migrations/versions/001_initial_migration.py
 """initial migration
 
 Revision ID: 001
