@@ -6,7 +6,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from core.models import TradeSignal, CalculatedTrade
-from core.parser import SignalProcessor
+from core.parser import SignalParser
 from services.mt5_manager import MT5ConnectionManager
 from services.risk_service import RiskService
 from services.subscription import SubscriptionService
@@ -32,7 +32,8 @@ class TradeExecutor:
         self.bot = bot
         
         # Initialize services
-        self.signal_processor = SignalProcessor()
+        #self.signal_processor = SignalProcessor()
+        self.signal_processor = SignalParser()
         self.risk_service = RiskService()
         self.sub_service = SubscriptionService(db_session)
         self.notification = NotificationService(db_session, bot)
