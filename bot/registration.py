@@ -161,8 +161,32 @@ class RegistrationHandler:
         
         # Encrypt password for storage
         encrypted_password = self.encryption.encrypt(password)
-        
-        # Attempt connection
+
+        # Create or update the user row FIRST so mt5_manager can always find it
+        existing = self.user_repo.get_by_telegram_id(user_id)
+        if existing:
+            self.user_repo.update_user(
+                user_id,
+                mt5_account_id=account,
+                mt5_password=encrypted_password,
+                mt5_server=server,
+                is_verified=False,   # will be set True on success below
+                mt_connected=False
+            )
+        else:
+            self.user_repo.create_user(
+                telegram_id=user_id,
+                telegram_username=update.effective_user.username,
+                first_name=update.effective_user.first_name,
+                last_name=update.effective_user.last_name,
+                mt5_account_id=account,
+                mt5_password=encrypted_password,
+                mt5_server=server,
+                is_verified=False,
+                mt_connected=False
+            )
+
+        # Attempt connection — user row now guaranteed to exist
         success, message = await self.mt5_manager.connect_user(
             user_id=user_id,
             mt5_account=account,
@@ -171,34 +195,13 @@ class RegistrationHandler:
         )
         
         if success:
-            # Create or update user in database
-            existing = self.user_repo.get_by_telegram_id(user_id)
-            
-            if existing:
-                # Update existing
-                self.user_repo.update_user(
-                    user_id,
-                    mt5_account_id=account,
-                    mt5_password=encrypted_password,
-                    mt5_server=server,
-                    is_verified=True,
-                    mt_connected=True
-                )
-                user = existing
-            else:
-                # Create new user
-                user = self.user_repo.create_user(
-                    telegram_id=user_id,
-                    telegram_username=update.effective_user.username,
-                    first_name=update.effective_user.first_name,
-                    last_name=update.effective_user.last_name,
-                    mt5_account_id=account,
-                    mt5_password=encrypted_password,
-                    mt5_server=server,
-                    is_verified=True,
-                    mt_connected=True
-                )
-            
+            # Mark user as verified and connected
+            self.user_repo.update_user(
+                user_id,
+                is_verified=True,
+                mt_connected=True
+            )
+
             # Send welcome notification
             self.notification.notify_connection_status(
                 user_id=user_id,
