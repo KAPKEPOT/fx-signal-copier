@@ -91,9 +91,9 @@ class Settings(BaseSettings):
         return v
     
     # Redis Configuration
-    REDIS_URL: Optional[str] = Field(None, env="REDIS_URL")
-    REDIS_MAX_CONNECTIONS: int = Field(10, env="REDIS_MAX_CONNECTIONS")
-    REDIS_SOCKET_TIMEOUT: int = Field(5, env="REDIS_SOCKET_TIMEOUT")
+    REDIS_URL: Optional[str] = Field(None, validation_alias='REDIS_URL')
+    REDIS_MAX_CONNECTIONS: int = Field(10, validation_alias='REDIS_MAX_CONNECTIONS')
+    REDIS_SOCKET_TIMEOUT: int = Field(5, validation_alias='REDIS_SOCKET_TIMEOUT')
     
     # Security
     ENCRYPTION_KEY: Optional[str] = Field(None, validation_alias='ENCRYPTION_KEY')
@@ -113,10 +113,10 @@ class Settings(BaseSettings):
         return v
     
     # Trading Configuration
-    DEFAULT_RISK_FACTOR: float = Field(0.01, env="DEFAULT_RISK_FACTOR")
-    MAX_RISK_FACTOR: float = Field(0.05, env="MAX_RISK_FACTOR")
-    MIN_RISK_FACTOR: float = Field(0.001, env="MIN_RISK_FACTOR")
-    DEFAULT_MAX_POSITION_SIZE: float = Field(10.0, env="DEFAULT_MAX_POSITION_SIZE")
+    DEFAULT_RISK_FACTOR: float = Field(0.01, validation_alias='DEFAULT_RISK_FACTOR')
+    MAX_RISK_FACTOR: float = Field(0.05, validation_alias='MAX_RISK_FACTOR')
+    MIN_RISK_FACTOR: float = Field(0.001, validation_alias='MIN_RISK_FACTOR')
+    DEFAULT_MAX_POSITION_SIZE: float = Field(10.0, validation_alias='DEFAULT_MAX_POSITION_SIZE')
     ALLOWED_SYMBOLS: List[str] = Field([
         'AUDCAD', 'AUDCHF', 'AUDJPY', 'AUDNZD', 'AUDUSD',
         'CADCHF', 'CADJPY', 'CHFJPY', 'EURAUD', 'EURCAD',
@@ -124,7 +124,7 @@ class Settings(BaseSettings):
         'GBPAUD', 'GBPCAD', 'GBPCHF', 'GBPJPY', 'GBPNZD',
         'GBPUSD', 'NZDCAD', 'NZDCHF', 'NZDJPY', 'NZDUSD',
         'USDCAD', 'USDCHF', 'USDJPY', 'XAGUSD', 'XAUUSD'
-    ], env="ALLOWED_SYMBOLS")
+    ], validation_alias='ALLOWED_SYMBOLS')
     
     @field_validator('ALLOWED_SYMBOLS', mode='before')
     @classmethod
@@ -144,60 +144,56 @@ class Settings(BaseSettings):
         return v
     
     # Rate Limiting
-    RATE_LIMIT_TRADES: int = Field(5, env="RATE_LIMIT_TRADES")  # per minute
-    RATE_LIMIT_CALCULATIONS: int = Field(10, env="RATE_LIMIT_CALCULATIONS")
-    RATE_LIMIT_BALANCE: int = Field(30, env="RATE_LIMIT_BALANCE")
-    RATE_LIMIT_POSITIONS: int = Field(20, env="RATE_LIMIT_POSITIONS")
+    RATE_LIMIT_TRADES: int = Field(5, validation_alias='RATE_LIMIT_TRADES')
+    RATE_LIMIT_CALCULATIONS: int = Field(10, validation_alias='RATE_LIMIT_CALCULATIONS')
+    RATE_LIMIT_BALANCE: int = Field(30, validation_alias='RATE_LIMIT_BALANCE')
+    RATE_LIMIT_POSITIONS: int = Field(20, validation_alias='RATE_LIMIT_POSITIONS')
     
     # Subscription Plans (prices in USD)
-    FREE_PLAN_MAX_TRADES: int = Field(10, env="FREE_PLAN_MAX_TRADES")
-    FREE_PLAN_MAX_SIZE: float = Field(1.0, env="FREE_PLAN_MAX_SIZE")
+    FREE_PLAN_MAX_TRADES: int = Field(10, validation_alias='FREE_PLAN_MAX_TRADES')
+    FREE_PLAN_MAX_SIZE: float = Field(1.0, validation_alias='FREE_PLAN_MAX_SIZE')
     
-    BASIC_PLAN_PRICE: float = Field(9.99, env="BASIC_PLAN_PRICE")
-    BASIC_PLAN_MAX_TRADES: int = Field(50, env="BASIC_PLAN_MAX_TRADES")
-    BASIC_PLAN_MAX_SIZE: float = Field(5.0, env="BASIC_PLAN_MAX_SIZE")
+    BASIC_PLAN_PRICE: float = Field(9.99, validation_alias='BASIC_PLAN_PRICE')
+    BASIC_PLAN_MAX_TRADES: int = Field(50, validation_alias='BASIC_PLAN_MAX_TRADES')
+    BASIC_PLAN_MAX_SIZE: float = Field(5.0, validation_alias='BASIC_PLAN_MAX_SIZE')
     
-    PRO_PLAN_PRICE: float = Field(29.99, env="PRO_PLAN_PRICE")
-    PRO_PLAN_MAX_TRADES: int = Field(200, env="PRO_PLAN_MAX_TRADES")
-    PRO_PLAN_MAX_SIZE: float = Field(10.0, env="PRO_PLAN_MAX_SIZE")
+    PRO_PLAN_PRICE: float = Field(29.99, validation_alias='PRO_PLAN_PRICE')
+    PRO_PLAN_MAX_TRADES: int = Field(200, validation_alias='PRO_PLAN_MAX_TRADES')
+    PRO_PLAN_MAX_SIZE: float = Field(10.0, validation_alias='PRO_PLAN_MAX_SIZE')
     
-    ENTERPRISE_PLAN_PRICE: float = Field(99.99, env="ENTERPRISE_PLAN_PRICE")
-    ENTERPRISE_PLAN_MAX_TRADES: int = Field(1000, env="ENTERPRISE_PLAN_MAX_TRADES")
-    ENTERPRISE_PLAN_MAX_SIZE: float = Field(50.0, env="ENTERPRISE_PLAN_MAX_SIZE")
+    ENTERPRISE_PLAN_PRICE: float = Field(99.99, validation_alias='ENTERPRISE_PLAN_PRICE')
+    ENTERPRISE_PLAN_MAX_TRADES: int = Field(1000, validation_alias='ENTERPRISE_PLAN_MAX_TRADES')
+    ENTERPRISE_PLAN_MAX_SIZE: float = Field(50.0, validation_alias='ENTERPRISE_PLAN_MAX_SIZE')
     
     # Notification Settings
-    NOTIFICATION_QUEUE_SIZE: int = Field(100, env="NOTIFICATION_QUEUE_SIZE")
-    NOTIFICATION_BATCH_SIZE: int = Field(10, env="NOTIFICATION_BATCH_SIZE")
-    NOTIFICATION_RETRY_ATTEMPTS: int = Field(3, env="NOTIFICATION_RETRY_ATTEMPTS")
+    NOTIFICATION_QUEUE_SIZE: int = Field(100, validation_alias='NOTIFICATION_QUEUE_SIZE')
+    NOTIFICATION_BATCH_SIZE: int = Field(10, validation_alias='NOTIFICATION_BATCH_SIZE')
+    NOTIFICATION_RETRY_ATTEMPTS: int = Field(3, validation_alias='NOTIFICATION_RETRY_ATTEMPTS')
     
     # Monitoring
-    METRICS_ENABLED: bool = Field(True, env="METRICS_ENABLED")
-    METRICS_PORT: int = Field(9090, env="METRICS_PORT")
-    SENTRY_DSN: Optional[str] = Field(None, env="SENTRY_DSN")
+    METRICS_ENABLED: bool = Field(True, validation_alias='METRICS_ENABLED')
+    METRICS_PORT: int = Field(9090, validation_alias='METRICS_PORT')
+    SENTRY_DSN: Optional[str] = Field(None, validation_alias='SENTRY_DSN')
     
     # Logging
-    LOG_LEVEL: str = Field("INFO", env="LOG_LEVEL")
+    LOG_LEVEL: str = Field("INFO", validation_alias='LOG_LEVEL')
     LOG_FORMAT: str = Field(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        env="LOG_FORMAT"
+        validation_alias='LOG_FORMAT'
     )
-    LOG_FILE: Optional[str] = Field(None, env="LOG_FILE")
-    LOG_MAX_BYTES: int = Field(10485760, env="LOG_MAX_BYTES")  # 10MB
-    LOG_BACKUP_COUNT: int = Field(5, env="LOG_BACKUP_COUNT")
+    LOG_FILE: Optional[str] = Field(None, validation_alias='LOG_FILE')
+    LOG_MAX_BYTES: int = Field(10485760, validation_alias='LOG_MAX_BYTES')
+    LOG_BACKUP_COUNT: int = Field(5, validation_alias='LOG_BACKUP_COUNT')
     
     # Feature Flags
-    ENABLE_AUTO_TRADING: bool = Field(True, env="ENABLE_AUTO_TRADING")
-    ENABLE_API_ACCESS: bool = Field(True, env="ENABLE_API_ACCESS")
-    ENABLE_WEBHOOKS: bool = Field(False, env="ENABLE_WEBHOOKS")
-    ENABLE_MULTIPLE_TPS: bool = Field(True, env="ENABLE_MULTIPLE_TPS")
+    ENABLE_AUTO_TRADING: bool = Field(True, validation_alias='ENABLE_AUTO_TRADING')
+    ENABLE_API_ACCESS: bool = Field(True, validation_alias='ENABLE_API_ACCESS')
+    ENABLE_WEBHOOKS: bool = Field(False, validation_alias='ENABLE_WEBHOOKS')
+    ENABLE_MULTIPLE_TPS: bool = Field(True, validation_alias='ENABLE_MULTIPLE_TPS')
     
     # Payment Processing (if using Stripe)
-    STRIPE_API_KEY: Optional[str] = Field(None, env="STRIPE_API_KEY")
-    STRIPE_WEBHOOK_SECRET: Optional[str] = Field(None, env="STRIPE_WEBHOOK_SECRET")
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    STRIPE_API_KEY: Optional[str] = Field(None, validation_alias='STRIPE_API_KEY')
+    STRIPE_WEBHOOK_SECRET: Optional[str] = Field(None, validation_alias='STRIPE_WEBHOOK_SECRET')
 
 # Create global settings instance
 settings = Settings()
