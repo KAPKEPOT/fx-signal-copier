@@ -1,7 +1,8 @@
 # fx/config/settings.py
 import os
 from typing import List, Optional, Dict, Any
-from pydantic import BaseSettings, validator, Field
+from pydantic_settings import BaseSettings
+from pydantic import validator, Field
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
