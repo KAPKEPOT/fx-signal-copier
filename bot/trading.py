@@ -19,14 +19,6 @@ logger = logging.getLogger(__name__)
 # Conversation states
 (ENTER_TRADE, CONFIRM_TRADE, ADJUST_RISK, EXECUTING) = range(4)
 
-TRADING_STATES = {
-    ENTER_TRADE: [MessageHandler(filters.TEXT & ~filters.COMMAND, TradingHandler.receive_trade)],
-    CONFIRM_TRADE: [CallbackQueryHandler(TradingHandler.confirm_trade, pattern='^trade_')],
-    ADJUST_RISK: [MessageHandler(filters.TEXT, TradingHandler.adjust_risk)],
-    EXECUTING: [],  # No input while executing
-}
-
-
 class TradingHandler:
     """
     Handles trading conversations
@@ -441,3 +433,11 @@ class TradingHandler:
         
         context.user_data.clear()
         return ConversationHandler.END
+
+# Defined after class so TradingHandler is in scope
+TRADING_STATES = {
+    ENTER_TRADE: [MessageHandler(filters.TEXT & ~filters.COMMAND, TradingHandler.receive_trade)],
+    CONFIRM_TRADE: [CallbackQueryHandler(TradingHandler.confirm_trade, pattern='^trade_')],
+    ADJUST_RISK: [MessageHandler(filters.TEXT, TradingHandler.adjust_risk)],
+    EXECUTING: [],
+}
