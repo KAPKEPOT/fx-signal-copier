@@ -37,7 +37,7 @@ class TradeExecutor:
         self.risk_service = RiskService()
         self.sub_service = SubscriptionService(db_session)
         self.notification = NotificationService(db_session, bot)
-        self.mt5_manager = MT5ConnectionManager(db_session)
+        self.mt5_manager = mt5_manager
         self.trade_repo = TradeRepository(db_session)
         self.user_repo = UserRepository(db_session)
         
