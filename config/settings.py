@@ -126,10 +126,21 @@ class Settings(BaseSettings):
         'USDCAD', 'USDCHF', 'USDJPY', 'XAGUSD', 'XAUUSD'
     ], env="ALLOWED_SYMBOLS")
     
-    @validator('ALLOWED_SYMBOLS', pre=True)
+    @field_validator('ALLOWED_SYMBOLS', mode='before')
+    @classmethod
     def parse_symbols(cls, v):
+        """Parse symbols from environment variable"""
+        if v is None:
+            return []
         if isinstance(v, str):
-            return [s.strip().upper() for s in v.split(',') if s.strip()]
+            # Try to parse as JSON first
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                # Fall back to comma-separated parsing
+                return [s.strip().upper() for s in v.split(',') if s.strip()]
+        if isinstance(v, (list, tuple)):
+            return [str(s).upper() for s in v]
         return v
     
     # Rate Limiting
