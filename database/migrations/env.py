@@ -1,16 +1,16 @@
-# fx/database/migrations/env.py
+import sys
+import os
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 from alembic import context
-import os
-import sys
 
-# Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add the project root to Python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
+# Now these imports will work
 from database.models import Base
-from database.database import db_manager
+from config.settings import settings
 
 # this is the Alembic Config object
 config = context.config
@@ -22,8 +22,8 @@ fileConfig(config.config_file_name)
 target_metadata = Base.metadata
 
 def get_url():
-    """Get database URL from environment"""
-    return os.getenv("DATABASE_URL", "sqlite:///./fx_signal_copier.db")
+    """Get database URL from settings"""
+    return settings.DATABASE_URL
 
 def run_migrations_offline():
     """Run migrations in 'offline' mode."""
