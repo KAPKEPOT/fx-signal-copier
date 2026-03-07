@@ -4,7 +4,7 @@ import asyncio
 from telegram import BotCommand
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, CallbackQueryHandler,
-    ConversationHandler, PicklePersistence
+    ConversationHandler
 )
 
 from config.settings import settings
@@ -20,6 +20,7 @@ from services.notification import NotificationService
 from services.cache import CacheService
 from services.queue import QueueService, AsyncTaskManager
 from services.monitoring import MonitoringService
+from database.db_persistence import DBPersistence
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,7 @@ class Bot:
 
         # Build application — handlers registered BEFORE build() via pre_init isn't
         # available, so we build first then add_handler before initialize() is called
-        persistence = PicklePersistence(filepath='bot_persistence')
+        persistence = DBPersistence()
         self.application = (
             ApplicationBuilder()
             .token(settings.BOT_TOKEN)
