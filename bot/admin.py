@@ -403,6 +403,6 @@ ADMIN_STATES = {
     ADMIN_MAIN: [CallbackQueryHandler(AdminHandler.handle_menu, pattern='^admin_')],
     USER_MANAGEMENT: [CallbackQueryHandler(AdminHandler.handle_user_management, pattern='^user_')],
     BROADCAST: [MessageHandler(filters.TEXT, AdminHandler.handle_broadcast)],
-    SYSTEM_STATS: [CallbackQueryHandler(AdminHandler.handle_stats, pattern='^stats_')],
+    SYSTEM_STATS: [CallbackQueryHandler(AdminHandler.handle_menu, pattern='^admin_')],
     CONFIRM_ACTION: [CallbackQueryHandler(AdminHandler.confirm_action, pattern='^confirm_')],
 }
