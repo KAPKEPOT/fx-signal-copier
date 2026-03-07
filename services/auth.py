@@ -10,7 +10,7 @@ from typing import Optional, Tuple, Dict, Any
 import jwt
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
 import os
 import logging
@@ -62,7 +62,7 @@ class EncryptionService:
         if salt is None:
             salt = os.urandom(16)
         
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
@@ -74,7 +74,7 @@ class EncryptionService:
     @staticmethod
     def verify_password(password: str, key: bytes, salt: bytes) -> bool:
         """Verify a password against a hash"""
-        kdf = PBKDF2(
+        kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
             salt=salt,
