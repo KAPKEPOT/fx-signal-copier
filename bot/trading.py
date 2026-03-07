@@ -379,19 +379,19 @@ class TradingHandler:
             if action == 'balance':
                 account_info = await connection.get_account_information()
                 formatted = format_balance(account_info)
-                await await update.message.reply_text(formatted, parse_mode=ParseMode.HTML)
+                await update.message.reply_text(formatted, parse_mode=ParseMode.HTML)
             
             elif action == 'positions':
                 positions = await connection.get_positions()
                 if positions:
                     formatted = format_positions(positions)
-                    await await update.message.reply_text(formatted, parse_mode=ParseMode.HTML)
+                    await update.message.reply_text(formatted, parse_mode=ParseMode.HTML)
                 else:
-                    await await update.message.reply_text("No open positions.")
+                    await update.message.reply_text("No open positions.")
             
         except Exception as e:
             logger.error(f"Action {action} failed: {e}")
-            await await update.message.reply_text(
+            await update.message.reply_text(
                 f"❌ Failed to get {action}: {str(e)[:100]}"
             )
         
@@ -418,7 +418,7 @@ class TradingHandler:
                     **kwargs
                 )
         else:
-            await await update.message.reply_text(text, **kwargs)
+            await update.message.reply_text(text, **kwargs)
     
     async def cancel(self, update: Update, context: CallbackContext) -> int:
         """Cancel the current operation"""
