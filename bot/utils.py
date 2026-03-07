@@ -4,7 +4,8 @@ import html
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 import humanize
-from telegram import Update, ParseMode
+from telegram import Update
+from telegram.constants import ParseMode
 from telegram.ext import CallbackContext
 
 
