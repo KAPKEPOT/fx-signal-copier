@@ -74,67 +74,82 @@
 
 · Redis
 
-· Gey your MT5 API HERE: [MetaAPI account](https://app.metaapi.cloud)
+· MetaAPI
 
 · Telegram Bot Token (from @BotFather)
 
-**One-Line Setup**
+#### **Setup Instructions**
 
-***bash***
- **Clone repository**
- ```
-git clone https://github.com/KAPKEPOT/fx-signal-copier.git
-cd fx-signal-copier
-```
-
-**Run setup script**
-```
-chmod +x scripts/quick_start.sh
-./scripts/quick_start.sh
-```
-
-#### Manual Installation
+##### Manual Installation
 
 **1. Clone and setup environment**
 
-***bash***
 ```
 git clone https://github.com/yourusername/fx-signal-copier.git
 cd fx-signal-copier
 ```
+**2. Create virtual environment**
 ```
 python -m venv fx
 ```
+**3. activate the environment**
 ```
-source venv/bin/activate
+source fx/bin/activate
 ```
 ***On Windows:***
 ```
 fx\Scripts\activate
 ```
+**4. Install dependencies**
+‎```
+‎make install
+‎```
+**or**
 ```
 pip install -r requirements.txt
 ```
 
-1. Configure environment variables
+**5. Copy environment file**
 
-***bash***
 ```
 cp .env.example .env
 ```
- Add your credentials
+ **6. Edit .env with your credentials**
 ```
 nano .env  
 ```
- *Add your credentials*
 
-**1. Start services with Docker**
-
-***bash***
+**7. Setup database (using Docker for local)**
 ```
-docker-compose up -d postgres redis
+sudo docker-compose up -d postgres redis
+```
+**8. Run migrations**
+```
 alembic upgrade head
 ```
+###### Before First Run:
+
+‎-  Create `Telegram bot` via [`@BotFather`](https://t.me/BotFather) and get BOT_TOKEN
+- ‎ Get MetaAPI token from [`MetaApI`](https://app.metaapi.cloud)
+  
+- ‎ Generate strong encryption key using this script:
+  ```
+   python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+  ```
+- Generate JWT secret using this script:
+  ```
+  python -c "import secrets; print(secrets.token_urlsafe(32))"
+  ```
+- Set ADMIN_USER_IDS to your Telegram user ID
+  
+- Configure database (PostgreSQL recommended)
+
+**9. Run the bot**
+```
+make run
+```
+**or**
+
 ```
 python main.py
 ```
@@ -152,7 +167,7 @@ ADMIN_USER_IDS=123456789,987654321
 METAAPI_TOKEN=your_metaapi_api_token
 
 # Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/fx_signal_copier
+DATABASE_URL=postgresql://fxuser:pass@localhost:5432/fx_signal_copier
 
 # Security
 ENCRYPTION_KEY=your_32_byte_base64_key
