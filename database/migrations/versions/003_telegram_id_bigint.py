@@ -13,12 +13,25 @@ down_revision = '002'
 branch_labels = None
 depends_on = None
 
+DROP_CONSTRAINT_SQL = """
+DO $$ BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'users_telegram_id_key'
+    ) THEN
+        ALTER TABLE users DROP CONSTRAINT users_telegram_id_key;
+    END IF;
+END $$;
+"""
+
 
 def upgrade():
-    # Drop the unique constraint and index first, alter the column, then recreate
-    op.drop_index('idx_user_telegram_id', table_name='users')
-    op.drop_constraint('users_telegram_id_key', 'users', type_='unique')
+    conn = op.get_bind()
 
+    # Drop index and constraint safely — may not exist if DB was built via create_all()
+    conn.execute(sa.text('DROP INDEX IF EXISTS idx_user_telegram_id'))
+    conn.execute(sa.text(DROP_CONSTRAINT_SQL))
+
+    # Alter column from INTEGER to BIGINT
     op.alter_column(
         'users', 'telegram_id',
         existing_type=sa.Integer(),
@@ -26,13 +39,16 @@ def upgrade():
         nullable=False
     )
 
+    # Recreate constraint and index
     op.create_unique_constraint('users_telegram_id_key', 'users', ['telegram_id'])
     op.create_index('idx_user_telegram_id', 'users', ['telegram_id'])
 
 
 def downgrade():
-    op.drop_index('idx_user_telegram_id', table_name='users')
-    op.drop_constraint('users_telegram_id_key', 'users', type_='unique')
+    conn = op.get_bind()
+
+    conn.execute(sa.text('DROP INDEX IF EXISTS idx_user_telegram_id'))
+    conn.execute(sa.text(DROP_CONSTRAINT_SQL))
 
     op.alter_column(
         'users', 'telegram_id',
