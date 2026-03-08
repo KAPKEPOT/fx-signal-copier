@@ -1,14 +1,13 @@
 ## FX Signal Copier Bot 📈🤖
-![python3]
-(https://img.shields.io/badge/python-3.9%2B-blue)
-![Telegram-Bot]
-(https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram)
-![MT5]
-(https://img.shields.io/badge/MetaTrader-5-FF4B4B)
-![MIT]
-(https://img.shields.io/badge/license-MIT-green)
-![docker]
-(https://img.shields.io/badge/docker-ready-2496ED?logo=docker)
+
+[![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python)](https://www.python.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker)](https://www.docker.com/)
+[![FX-SIGNAL-COPIER](https://img.shields.io/badge/Telegram-Bot-26A5E4?logo=telegram)](https://t.me/fxsignalcopier1bot)
+[![MetaAPI](https://img.shields.io/badge/MetaAPI-Cloud-00B5B8?logo=cloud)](https://metaapi.cloud/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/KAPKEPOT/fx-signal-copier/blob/main/LICENSE)
+[![Telegram](https://img.shields.io/badge/Telegram-Support%20Group-26A5E4?logo=telegram)](https://t.me/CipherTrade1)
 
 A powerful Telegram bot that automatically executes forex trades on MetaTrader 5 accounts. Users can send trading signals via Telegram, and the bot calculates position sizes based on risk management rules and executes trades automatically.
 
