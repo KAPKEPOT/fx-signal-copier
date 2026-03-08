@@ -261,7 +261,7 @@ class MT5ConnectionManager:
             account = await self.api.metatrader_account_api.get_account(account_id)
             logger.info(f"Found existing account for user {user_id}")
             return account
-        except Exception:
+        except Exception as e:
             if "404" in str(e) or "not found" in str(e).lower():
             	
             	# Account doesn't exist, create new one
