@@ -1,6 +1,8 @@
 # fx/bot/main.py
 import logging
 import asyncio
+import warnings
+from telegram.warnings import PTBUserWarning
 from telegram import BotCommand
 from telegram.ext import (
     ApplicationBuilder, CommandHandler, CallbackQueryHandler,
@@ -75,6 +77,10 @@ class Bot:
 
         # Error handler needs notification + monitoring (both sync-ready)
         self.error_handler = ErrorHandler(self.notification, self.monitoring)
+
+        # Suppress expected per_message warning — our conversations intentionally
+        # mix MessageHandler and CallbackQueryHandler states, making per_message=False correct.
+        warnings.filterwarnings('ignore', message=".*per_message=False.*", category=PTBUserWarning)
 
         # Register all handlers NOW — before initialize() is called by run_polling()
         self._setup_middleware()
@@ -198,10 +204,15 @@ class Bot:
             BotCommand("upgrade",   "Upgrade subscription"),
         ])
 
-        # Schedule background tasks — use application.create_task so PTB tracks them
-        application.create_task(self._background_tasks())
+        # Schedule background tasks via job_queue (runs after polling starts, not during init)
+        application.job_queue.run_once(
+            lambda ctx: asyncio.ensure_future(self._background_tasks()),
+            when=0,
+            name="background_tasks"
+        )
 
         logger.info("Bot initialized successfully")
+
 
     async def _post_shutdown(self, application):
         logger.info("Shutting down services...")
@@ -275,4 +286,7 @@ class Bot:
                 webhook_url=f"{settings.APP_URL}/{settings.BOT_TOKEN}",
             )
         else:
-            self.application.run_polling()
+            self.application.run_polling(
+                allowed_updates=None,
+                drop_pending_updates=False,
+            )
