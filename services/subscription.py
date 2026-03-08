@@ -61,10 +61,34 @@ class SubscriptionService:
         
         plan = self.get_plan(user.subscription_tier)
         if not plan:
-            # Fallback to free plan
-            plan = self.get_plan('free')
+            logger.error(f"Plan '{user.subscription_tier}' not found for user {user_id}, falling back to free")
+            
+            free_plan = self.get_plan('free')
+            
+            if not free_plan:
+            	# Create default free plan if it doesn't exist
+            	from database.models import SubscriptionPlan
+            	free_plan = SubscriptionPlan(
+            	    tier='free',
+            	    name='Free',
+            	    price_monthly=0,
+            	    price_yearly=0,
+            	    max_trades_per_day=10,
+            	    max_position_size=1.0,
+            	    max_symbols=30,
+            	    supports_multiple_tps=False,
+            	    supports_auto_trading=False,
+            	    supports_api=False,
+            	    support_priority='low',
+            	    max_connections=1
+            	)
+            	self.db.add(free_plan)
+            	self.db.commit()
+            	
+            # plan = self.get_plan('free')
             user.subscription_tier = 'free'
             self.db.commit()
+            return free_plan
         
         return plan
     
@@ -238,17 +262,37 @@ class SubscriptionService:
         return count
     
     def get_usage_stats(self, user_id: int) -> Dict[str, Any]:
-        """Get usage statistics for user"""
-        user = self.user_repo.get_by_telegram_id(user_id)
-        if not user:
-            raise SubscriptionError("User not found")
-        
-        plan = self.get_user_plan(user_id)
-        
-        # Calculate usage percentages
-        trade_usage = (user.daily_trades / plan.max_trades_per_day * 100) if plan.max_trades_per_day > 0 else 0
-        
-        return {
+    	"""Get usage statistics for user"""
+    	user = self.user_repo.get_by_telegram_id(user_id)
+    	
+    	if not user:
+    		raise SubscriptionError("User not found")
+    	
+    	plan = self.get_user_plan(user_id)
+    	
+    	if plan is None:
+    		# Log this unexpected situation
+    		logger.error(f"User {user_id} has no valid plan, using default stats")
+    		
+    		return {
+    		    'plan': 'unknown',
+    		    'expiry': None,
+    		    'trades_today': user.daily_trades,
+    		    'trade_limit': 0,
+    		    'trade_usage_percent': 0,
+    		    'total_trades': user.total_trades,
+    		    'total_volume': user.total_volume,
+    		    'features': {
+    		        'multiple_tps': False,
+    		        'auto_trading': False,
+    		        'api_access': False
+    		    }
+    		}
+    	
+    	# Calculate usage percentages
+    	trade_usage = (user.daily_trades / plan.max_trades_per_day * 100) if plan and plan.max_trades_per_day > 0 else 0
+    	
+    	return {
             'plan': plan.tier,
             'expiry': user.subscription_expiry.isoformat() if user.subscription_expiry else None,
             'trades_today': user.daily_trades,
