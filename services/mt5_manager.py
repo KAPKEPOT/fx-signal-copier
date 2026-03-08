@@ -171,75 +171,41 @@ class MT5ConnectionManager:
         
         # Readiness tracking
         self._ready = asyncio.Event()
-        self._ready_task: Optional[asyncio.Task] = None
         self._ready_error: Optional[str] = None
     
     async def start(self):
-        """Start the connection manager and verify it's working"""
+        """Start the connection manager"""
         logger.info("Starting MT5 Connection Manager...")
         
         # Start the connection pool
         await self.pool.start()
         
-        # Start readiness verification in background
-        self._ready_task = asyncio.create_task(self._verify_readiness())
-        logger.info("MT5 Connection Manager started, verifying readiness...")
-    
-    async def _verify_readiness(self):
-        """Verify the manager is fully operational"""
-        try:
-            # Step 1: Verify MetaAPI token is valid by fetching account info
-            logger.info("Verifying MetaAPI connection...")
-            
-            # Try to get a test account or just ping the API
-            # Since we don't have a user yet, we'll just check if we can connect to MetaAPI
-            try:
-                # This will verify the token is valid
-                accounts = await self.api.metatrader_account_api.get_accounts()
-                logger.info(f"MetaAPI connection verified. Found {len(accounts)} accounts")
-            except Exception as e:
-                logger.error(f"MetaAPI connection failed: {e}")
-                self._ready_error = f"MetaAPI connection failed: {str(e)}"
-                return
-            
-            # Step 2: Verify connection pool is working
-            logger.info("Verifying connection pool...")
-            if not self.pool or not hasattr(self.pool, '_cleanup_task'):
-                self._ready_error = "Connection pool not initialized properly"
-                return
-            
-            # Step 3: Perform a real test connection (optional but recommended)
-            # This would require a test user account - you could create a system user for testing
-            # For now, we'll consider the manager ready if MetaAPI is reachable
-            
-            logger.info("MT5 Connection Manager is ready")
-            self._ready.set()
-            
-        except Exception as e:
-            logger.error(f"Readiness verification failed: {e}")
-            self._ready_error = str(e)
-    
+        # Don't do any verification here - just start the pool
+        # The manager is considered "ready" to handle connection requests
+        # Individual connections will be verified when users try to connect
+        self._ready.set()
+        
+        logger.info("MT5 Connection Manager started")
+        
     async def wait_until_ready(self, timeout: float = 30.0) -> Tuple[bool, Optional[str]]:
         """
         Wait until the manager is ready to handle connections
-        Returns (is_ready, error_message)
+        This just waits for the pool to start, not for MetaAPI verification
         """
         try:
             await asyncio.wait_for(self._ready.wait(), timeout=timeout)
             return True, None
         except asyncio.TimeoutError:
-            error = self._ready_error or "Timeout waiting for MT5 manager to be ready"
-            logger.error(error)
-            return False, error
+            return False, "Timeout waiting for connection manager to start"
             
     @property
     def is_ready(self) -> bool:
-        """Check if manager is ready"""
+        """Check if manager is ready (pool is running)"""
         return self._ready.is_set()
     
     @property
     def ready_error(self) -> Optional[str]:
-        """Get the error if readiness verification failed"""
+        """Get any startup error"""
         return self._ready_error
         
     async def stop(self):
@@ -358,14 +324,9 @@ class MT5ConnectionManager:
             	raise
             	
     async def get_connection(self, user_id: int):
-        """
-        Get a connection for a user from the pool
-        """
-        # Ensure manager is ready before proceeding
-        if not self.is_ready:
-            ready, error = await self.wait_until_ready(timeout=5.0)
-            if not ready:
-                raise ConnectionError(f"MT5 manager not ready: {error}")
+        # Wait for pool to be ready (should be almost instant)
+        if not await self.wait_until_ready(timeout=5.0):
+            raise ConnectionError("Connection manager not ready")
         
         logger.info(f"Getting connection for user {user_id}")
         user = self.user_repo.get_by_telegram_id(user_id)
@@ -375,15 +336,23 @@ class MT5ConnectionManager:
         # Decrypt password
         password = self.encryption.decrypt(user.mt5_password)
         
-        # Get or create account - this can take time
-        logger.info(f"Getting/creating MetaAPI account for user {user_id}")
-        account = await self._get_or_create_account(
-            user_id, user.mt5_account_id, password, user.mt5_server
-        )
+        try:
+            account = await self._get_or_create_account(
+                user_id, user.mt5_account_id, password, user.mt5_server
+            )
+        except Exception as e:
+            logger.error(f"Failed to get/create MetaAPI account for user {user_id}: {e}")
+            # Check for MetaAPI token issues
+            if "401" in str(e) or "403" in str(e) or "unauthorized" in str(e).lower():
+                raise ConnectionError("MetaAPI token is invalid. Please check your METAAPI_TOKEN.")
+            raise
         
-        # Get connection from pool - this can also take time
-        logger.info(f"Getting connection from pool for user {user_id}")
-        connection = await self.pool.get_connection(user_id, self.api, account.id)
+        # Get connection from pool
+        try:
+            connection = await self.pool.get_connection(user_id, self.api, account.id)
+        except Exception as e:
+            logger.error(f"Failed to get connection from pool for user {user_id}: {e}")
+            raise
         
         logger.info(f"Successfully got connection for user {user_id}")
         return connection
