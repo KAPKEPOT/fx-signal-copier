@@ -12,7 +12,7 @@
 [![Telegram](https://img.shields.io/badge/Cipher-Trading%20Group-26A5E4?logo=telegram)](https://t.me/CipherTrade1)
 
 
-A powerful Telegram bot that automatically executes forex trades on MetaTrader 5 accounts. Users can send trading signals via Telegram, and the bot calculates position sizes based on risk management rules and executes trades automatically.
+**A powerful Telegram bot that automatically executes forex trades on MetaTrader 5 accounts. Users can send trading signals via Telegram, and the bot calculates position sizes based on risk management rules and executes trades automatically.**
 
 #### ✨ Features
 
@@ -28,7 +28,7 @@ A powerful Telegram bot that automatically executes forex trades on MetaTrader 5
 
 · **All Order Types** - Market, Limit, and Stop orders
 
-**🔐 Security**
+#### **🔐 Security**
 
 · **Encrypted Credentials** - User passwords securely encrypted
 
@@ -139,7 +139,7 @@ alembic upgrade head
 python main.py
 ```
 
-📝 Configuration
+#### **📝 Configuration**
 
 Required Environment Variables
 
@@ -218,7 +218,7 @@ TP2 1.11000
 
 #### 🐳 Docker Deployment
 
-##### Production Setup
+ **Production Setup**
 
  **Build and start all services**
 ```
@@ -274,15 +274,15 @@ fx-signal-copier/
 ```
 pip install -r requirements-dev.txt
 ```
-##### Setup pre-commit hooks
+**Setup pre-commit hooks**
 ```
 pre-commit install
 ```
-##### Run linters
+**Run linters**
 ```
 make lint
 ```
-##### Format code
+ **Format code**
 ```
 make format
 ```
