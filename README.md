@@ -128,8 +128,7 @@ sudo docker-compose up -d postgres redis
 alembic upgrade head
 ```
 ###### Before First Run:
-
-‎-  Create `Telegram bot` via [`@BotFather`](https://t.me/BotFather) and get BOT_TOKEN
+- Create `Telegram bot` via [`@BotFather`](https://t.me/BotFather) and get BOT_TOKEN
 - ‎ Get MetaAPI token from [`MetaApI`](https://app.metaapi.cloud)
   
 - ‎ Generate strong encryption key using this script:
@@ -143,6 +142,7 @@ alembic upgrade head
 - Set ADMIN_USER_IDS to your Telegram user ID
   
 - Configure database (PostgreSQL recommended)
+  
 
 **9. Run the bot**
 ```
@@ -156,7 +156,7 @@ python main.py
 
 #### **📝 Configuration**
 
-Required Environment Variables
+**Required Environment Variables**
 
 ```env
 # Telegram
@@ -280,31 +280,9 @@ fx-signal-copier/
 └── README.md            # This file
 ```
 
-### 🔧 Development
-
-**Setup Development Environment**
-
-**bash**
-##### Install dev dependencies
-```
-pip install -r requirements-dev.txt
-```
-**Setup pre-commit hooks**
-```
-pre-commit install
-```
-**Run linters**
-```
-make lint
-```
- **Format code**
-```
-make format
-```
 
 #### Database Migrations
 
-**bash**
  **Create new migration**
 ```
 alembic revision --autogenerate -m "description"
@@ -321,13 +299,10 @@ alembic downgrade -1
 
 #### **📈 Performance**
 
-·**Response Time:** < 2 seconds for trade execution
-
-·**Concurrent Users:** Supports 1000+ users
-
-·**Uptime:** 99.9% with proper deployment
-
-·**Rate Limits:** Configurable per user tier
+- **Response Time:** < 2 seconds for trade execution
+- **Concurrent Users:** Supports 1000+ users
+- **Uptime:** 99.9% with proper deployment
+- **Rate Limits:** Configurable per user tier
 
 #### **🔒 Security**
 
@@ -369,31 +344,30 @@ The bot includes comprehensive error handling:
 
 #### **Development Guidelines**
 
-· Follow PEP 8 style guide
-· Add tests for new features
-· Update documentation
-· Keep backwards compatibility
+- Follow PEP 8 style guide
+- Add tests for new features
+- Update documentation
+- Keep backwards compatibility
 
 #### **📄 License**
 
 Distributed under the MIT License. See LICENSE for more information.
 
-📞 Support
+##### **📞 Support**
 
-· Telegram: [FX-SIGNAL-COPIER](https://t.me/fxsignalcopier1bot)
-
-· Email: support@fxsignalcopier.com
-· Issues: GitHub Issues
+- Telegram: [FX-SIGNAL-COPIER](https://t.me/fxsignalcopier1bot)
+- Email: support@fxsignalcopier.com
+- Issues: GitHub Issues
 
 ##### **🙏 Acknowledgments**
 
-· python-telegram-bot
-· MetaAPI Cloud SDK
-· SQLAlchemy
-· All contributors and users
+- python-telegram-bot
+- MetaAPI Cloud SDK
+- SQLAlchemy
+- All contributors and users
 
 **⭐ Star History**
 
-https://api.star-history.com/svg?repos=KAPKEPOT/fx-signal-copier&type=Date
+[![Star History Chart](https://api.star-history.com/svg?repos=KAPKEPOT/fx-signal-copier&type=Date)](https://star-history.com/#KAPKEPOT/fx-signal-copier&Date)
 
 </div>
