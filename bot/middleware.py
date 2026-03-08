@@ -1,6 +1,7 @@
 # fx/bot/middleware.py
 import logging
 import time
+import asyncio  # ← ADD THIS IMPORT!
 from datetime import datetime, timezone
 from functools import wraps
 from typing import Callable, Dict, Any, Optional
@@ -33,7 +34,8 @@ class AuthMiddleware:
         Wrap a handler function with authentication check
         """
         @wraps(handler_func)
-        async def wrapper(update, context):
+        async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+            """Added *args, **kwargs to fix the error"""
             user_id = update.effective_user.id
             
             # Check if user exists and is active
@@ -44,28 +46,28 @@ class AuthMiddleware:
                     "❌ You need to register first!\n\n"
                     "Use /register to connect your MT5 account."
                 )
-                return
+                return None  # Return None instead of nothing
             
             if not user.is_active:
                 await update.message.reply_text(
                     "❌ Your account is deactivated.\n"
                     "Please contact support for assistance."
                 )
-                return
+                return None
             
             if user.is_banned:
                 await update.message.reply_text(
                     "❌ Your account has been banned.\n"
                     "Please contact support if you believe this is an error."
                 )
-                return
+                return None
             
             # Update last active timestamp
             user.last_active = datetime.now(timezone.utc)
             self.db.commit()
             
-            # Call the original handler
-            return handler_func(update, context, *args, **kwargs)
+            # Call the original handler with ALL arguments
+            return await handler_func(update, context, *args, **kwargs)  # ← Added await!
         
         return wrapper
     
@@ -74,16 +76,17 @@ class AuthMiddleware:
         Wrap a handler function with admin authentication check
         """
         @wraps(handler_func)
-        async def wrapper(update, context):
+        async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+            """Added *args, **kwargs to fix the error"""
             user_id = update.effective_user.id
             
             # Check if user is admin
             if user_id not in settings.ADMIN_USER_IDS:
                 await update.message.reply_text("❌ Unauthorized access.")
-                return
+                return None
             
-            # Call the original handler
-            return handler_func(update, context, *args, **kwargs)
+            # Call the original handler with ALL arguments
+            return await handler_func(update, context, *args, **kwargs)  # ← Added await!
         
         return wrapper
 
@@ -138,7 +141,8 @@ class RateLimitMiddleware:
         """
         def decorator(handler_func: Callable) -> Callable:
             @wraps(handler_func)
-            async def wrapper(update, context):
+            async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+                """Added *args, **kwargs to fix the error"""
                 user_id = update.effective_user.id
                 
                 # Check rate limit
@@ -150,10 +154,10 @@ class RateLimitMiddleware:
                         f"Please wait {retry_after} seconds before trying again.",
                         parse_mode=ParseMode.MARKDOWN
                     )
-                    return
+                    return None
                 
-                # Call the original handler
-                return handler_func(update, context, *args, **kwargs)
+                # Call the original handler with ALL arguments
+                return await handler_func(update, context, *args, **kwargs)  # ← Added await!
             
             return wrapper
         
@@ -171,7 +175,7 @@ class ErrorHandler:
         self.notification = notification_service
         self.monitoring = monitoring_service
     
-    async def handle(self, update, context) -> None:
+    async def handle(self, update: Update, context: CallbackContext) -> None:
         """
         Handle errors raised in dispatcher
         """
@@ -251,7 +255,8 @@ class LoggingMiddleware:
         Wrap handler function with logging
         """
         @wraps(handler_func)
-        async def wrapper(update, context):
+        async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+            """Added *args, **kwargs to fix the error"""
             start_time = time.time()
             user = update.effective_user
             chat = update.effective_chat
@@ -263,8 +268,8 @@ class LoggingMiddleware:
             )
             
             try:
-                # Call handler
-                result = handler_func(update, context, *args, **kwargs)
+                # Call handler with ALL arguments
+                result = await handler_func(update, context, *args, **kwargs)  # ← Added await!
                 
                 # Log success
                 duration = time.time() - start_time
@@ -300,7 +305,8 @@ class PerformanceMiddleware:
         """
         def decorator(handler_func: Callable) -> Callable:
             @wraps(handler_func)
-            async def wrapper(update, context):
+            async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+                """Added *args, **kwargs to fix the error"""
                 user_id = update.effective_user.id if update.effective_user else 'unknown'
                 operation_id = f"{operation_name}_{user_id}_{int(time.time())}"
                 
@@ -315,8 +321,8 @@ class PerformanceMiddleware:
                 )
                 
                 try:
-                    # Call handler
-                    result = handler_func(update, context, *args, **kwargs)
+                    # Call handler with ALL arguments
+                    result = await handler_func(update, context, *args, **kwargs)  # ← Added await!
                     
                     # End tracking - success
                     self.tracker.end_operation(operation_id, 'success')
@@ -346,7 +352,8 @@ class MaintenanceMiddleware:
         Wrap handler function with maintenance check
         """
         @wraps(handler_func)
-        async def wrapper(update, context):
+        async def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+            """Added *args, **kwargs to fix the error"""
             # Check if maintenance mode is enabled
             maintenance_mode = self.cache.get('system:maintenance_mode', False)
             
@@ -359,10 +366,10 @@ class MaintenanceMiddleware:
                         "Please try again later.",
                         parse_mode=ParseMode.MARKDOWN
                     )
-                    return
+                    return None
             
-            # Call the original handler
-            return handler_func(update, context, *args, **kwargs)
+            # Call the original handler with ALL arguments
+            return await handler_func(update, context, *args, **kwargs)  # ← Added await!
         
         return wrapper
 
