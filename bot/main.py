@@ -182,14 +182,26 @@ class Bot:
         # MetaApi requires a running event loop
         self.mt5_manager = MT5ConnectionManager(self.db)
         await self.mt5_manager.start()
-
-        # Inject shared mt5_manager into handlers that need it
-        self.registration.mt5_manager = self.mt5_manager
-        self.trading.mt5_manager = self.mt5_manager
-        self.trading.mt5_manager_ready.set()
-        if hasattr(self.trading, 'trade_executor') and self.trading.trade_executor:
-            self.trading.trade_executor.mt5_manager = self.mt5_manager
-
+        
+        # Wait for manager to be truly ready (with timeout)
+        logger.info("Waiting for MT5 connection manager to be ready...")
+        is_ready, error = await self.mt5_manager.wait_until_ready(timeout=30.0)
+        
+        if not is_ready:
+        	logger.error(f"MT5 connection manager failed to become ready: {error}")
+        	# Log but continue - the system will handle unready state gracefully
+        	# Don't set the event - let it fail gracefully with proper error messages
+        else:
+        	logger.info("MT5 connection manager is ready")
+        	
+        	# Inject shared mt5_manager into handlers that need it
+        	self.registration.mt5_manager = self.mt5_manager
+        	self.trading.mt5_manager = self.mt5_manager
+        	self.trading.mt5_manager_ready.set()
+        	
+        	if hasattr(self.trading, 'trade_executor') and self.trading.trade_executor:
+        		self.trading.trade_executor.mt5_manager = self.trading.mt5_manager
+        		
         # Set bot commands
         await self.bot.set_my_commands([
             BotCommand("start",     "Start the bot"),

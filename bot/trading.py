@@ -384,10 +384,26 @@ class TradingHandler:
         user_id = update.effective_user.id
         action = context.user_data.get('action')
         
-        # Wait for mt5_manager to be ready
-        if not await self.wait_for_mt5_manager():
+        # Check if mt5_manager exists at all
+        if self.mt5_manager is None:
         	await update.message.reply_text(
-        	    "❌ System is still initializing. Please try again in a few seconds."
+        	    "❌ Trading system is still starting up. Please wait a moment and try again.\n"
+            "If this persists, check that MetaAPI credentials are configured correctly."
+        	)
+        	context.user_data.clear()
+        	return
+        
+        # Wait for mt5_manager to be ready
+        if not await self.wait_for_mt5_manager(timeout=30.0):
+        	# Check if there's a specific error
+        	if hasattr(self.mt5_manager, 'ready_error') and self.mt5_manager.ready_error:
+        		error_msg = self.mt5_manager.ready_error
+        	else:
+        		error_msg = "System is taking longer than expected to initialize"
+        		
+        	await update.message.reply_text(
+        	    f"❌ {error_msg}\n\n"
+            "Please try again in a moment. If the problem persists, contact support."
         	)
         	context.user_data.clear()
         	return
@@ -409,11 +425,26 @@ class TradingHandler:
                     await update.message.reply_text("No open positions.")
             
         except Exception as e:
-            logger.error(f"Action {action} failed: {e}")
-            await update.message.reply_text(
-                f"❌ Failed to get {action}: {str(e)[:100]}"
-            )
-        
+            logger.error(f"Action {action} failed for user {user_id}: {e}")
+            
+            # Provide user-friendly error messages
+            if "MetaAPI" in str(e) or "token" in str(e).lower():
+            	await update.message.reply_text(
+            	    "❌ MetaAPI connection error. Please check server configuration."
+            	)
+            elif "not found" in str(e).lower():
+            	await update.message.reply_text(
+            	    "❌ MT5 account not found. Please check your credentials in /settings"
+            	)
+            elif "timeout" in str(e).lower():
+            	await update.message.reply_text(
+            	    "❌ Connection timeout. Please try again later."
+            	)
+            else:
+            	await update.message.reply_text(
+            	    f"❌ Failed to get {action}: {str(e)[:100]}"
+            	)
+            	
         context.user_data.clear()
     
     async def _edit_message(self, update: Update, context: CallbackContext, 
