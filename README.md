@@ -66,9 +66,13 @@ A powerful Telegram bot that automatically executes forex trades on MetaTrader 5
 **Prerequisites**
 
 · Python 3.9+
+
 · PostgreSQL
+
 · Redis
-· [MetaAPI account] (https://app.metaapi.cloud)
+
+· Gey your MT5 API HERE: [MetaAPI account](https://app.metaapi.cloud)
+
 · Telegram Bot Token (from @BotFather)
 
 **One-Line Setup**
@@ -177,7 +181,6 @@ JWT_SECRET=your_jwt_secret
 |:-----|--------|
 |/admin |Admin dashboard|
 |/stats |System statistics|
-|-------|-------------|
 |/broadcast |Send message to all users|
 
 ##### 📊 Trade Signal Format
@@ -232,9 +235,13 @@ docker-compose down
 ##### Docker Compose Services
 
 · ***postgres** - Database
+
 · **redis** - Cache and rate limiting
+
 · **bot** - Main Telegram bot
+
 · **celery-worker** - Background tasks
+
 · **celery-beat** - Scheduled tasks
 
 
@@ -296,18 +303,25 @@ alembic downgrade -1
 
 #### **📈 Performance**
 
-· **Response Time:** < 2 seconds for trade execution
-· **Concurrent Users:** Supports 1000+ users
-· **Uptime:** 99.9% with proper deployment
-· **Rate Limits:** Configurable per user tier
+·**Response Time:** < 2 seconds for trade execution
+
+·**Concurrent Users:** Supports 1000+ users
+
+·**Uptime:** 99.9% with proper deployment
+
+·**Rate Limits:** Configurable per user tier
 
 #### **🔒 Security**
 
-· **Password Encryption:** AES-256 encryption for MT5 passwords
-· **JWT Tokens:** For API authentication
-· **Rate Limiting:** Prevents brute force attacks
-· **Input Validation:** All user input sanitized
-· **SQL Injection:** Protected by SQLAlchemy ORM
+·**Password Encryption:** AES-256 encryption for MT5 passwords
+
+·**JWT Tokens:** For API authentication
+
+·**Rate Limiting:** Prevents brute force attacks
+
+·**Input Validation:** All user input sanitized
+
+·**SQL Injection:** Protected by SQLAlchemy ORM
 
 #### **🚦 Error Handling**
 
@@ -320,7 +334,7 @@ The bot includes comprehensive error handling:
 · Database errors
 · API timeouts
 
-📊 Monitoring
+#### 📊 Monitoring
 
 · Prometheus Metrics available on port 9090
 · Structured Logging with JSON format
@@ -349,6 +363,7 @@ Distributed under the MIT License. See LICENSE for more information.
 📞 Support
 
 · Telegram: [FX-SIGNAL-COPIER](https://t.me/fxsignalcopier1bot)
+
 · Email: support@fxsignalcopier.com
 · Issues: GitHub Issues
 
