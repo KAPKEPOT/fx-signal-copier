@@ -136,7 +136,7 @@ class CommandHandlers:
         user_id = update.effective_user.id
         
         context.user_data['action'] = 'positions'
-        return self._forward_to_trading(update, context)
+        return await self._forward_to_trading(update, context)
     
     async def history(self, update: Update, context: CallbackContext):
         """Handle /history command"""
@@ -246,4 +246,4 @@ class CommandHandlers:
         from bot.trading import TradingHandler
         
         handler = TradingHandler(self.db, self.bot)
-        return handler.handle_action(update, context)
+        return await handler.handle_action(update, context)
