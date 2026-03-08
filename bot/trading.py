@@ -35,7 +35,18 @@ class TradingHandler:
         
         # Track active trades for rate limiting
         self.active_trades = {}
-    
+        self.mt5_manager_ready = asyncio.Event()
+        if mt5_manager is not None:
+        	self.mt5_manager_ready.set()
+        	
+    async def wait_for_mt5_manager(self, timeout: float = 30.0) -> bool:
+    	"""Wait for mt5_manager to be initialized"""
+    	try:
+    		await asyncio.wait_for(self.mt5_manager_ready.wait(), timeout=timeout)
+    		return True
+    	except asyncio.TimeoutError:
+    		return False
+    	
     async def start_trade(self, update: Update, context: CallbackContext) -> int:
         """Start the trade placement flow"""
         user_id = update.effective_user.id
@@ -372,6 +383,14 @@ class TradingHandler:
         """Handle simple actions (balance, positions)"""
         user_id = update.effective_user.id
         action = context.user_data.get('action')
+        
+        # Wait for mt5_manager to be ready
+        if not await self.wait_for_mt5_manager():
+        	await update.message.reply_text(
+        	    "❌ System is still initializing. Please try again in a few seconds."
+        	)
+        	context.user_data.clear()
+        	return
         
         try:
             connection = await self.mt5_manager.get_connection(user_id)

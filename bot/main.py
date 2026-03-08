@@ -186,6 +186,7 @@ class Bot:
         # Inject shared mt5_manager into handlers that need it
         self.registration.mt5_manager = self.mt5_manager
         self.trading.mt5_manager = self.mt5_manager
+        self.trading.mt5_manager_ready.set()
         if hasattr(self.trading, 'trade_executor') and self.trading.trade_executor:
             self.trading.trade_executor.mt5_manager = self.mt5_manager
 
