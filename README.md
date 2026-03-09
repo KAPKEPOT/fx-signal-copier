@@ -125,11 +125,11 @@ alembic upgrade head
   
 - ‎ Generate strong encryption key using this script:
   ```
-   python -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
+   python3 -c "import base64, os; print(base64.urlsafe_b64encode(os.urandom(32)).decode())"
   ```
 - Generate JWT secret using this script:
   ```
-  python -c "import secrets; print(secrets.token_urlsafe(32))"
+  python3 -c "import secrets; print(secrets.token_urlsafe(32))"
   ```
 - Set ADMIN_USER_IDS to your Telegram user ID
   
