@@ -57,6 +57,7 @@ clean:
 
 docker-up:
 	docker-compose up -d
+    sudo docker-compose up -d postgres redis
 
 docker-down:
 	docker-compose down
