@@ -102,6 +102,10 @@ nano .env
 
 **7. Setup database (using Docker for local)**
 ```
+Make docker-up
+```
+**or**
+```
 sudo docker-compose up -d postgres redis
 ```
 **8. Run migrations**
