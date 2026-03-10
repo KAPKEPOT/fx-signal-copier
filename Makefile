@@ -56,8 +56,8 @@ clean:
 	find . -type d -name ".mypy_cache" -exec rm -rf {} +
 
 docker-up:
-    sudo docker-compose up -d postgres redis
-
+    sudo docker-compose up -d postgres redis   # <-- tab, then space(s) after tab are fine
+                                                # blank line should have no indentation
 docker-down:
 	docker-compose down
 
