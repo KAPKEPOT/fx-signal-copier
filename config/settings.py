@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     APP_DESCRIPTION: str = "Telegram Bot for MetaTrader 5 Trading"
     DEBUG: bool = Field(False, validation_alias='DEBUG')
     
+    # Gateway settings
+    GATEWAY_CONFIG = {
+        'host': os.getenv('GATEWAY_HOST', 'localhost'),
+        'port': int(os.getenv('GATEWAY_PORT', '8080')),
+        'use_ssl': os.getenv('GATEWAY_USE_SSL', 'false').lower() == 'true',
+        'api_key_header': os.getenv('GATEWAY_API_KEY_HEADER', 'X-API-Key'),
+        'connect_timeout': float(os.getenv('GATEWAY_CONNECT_TIMEOUT', '10.0')),
+        'request_timeout': float(os.getenv('GATEWAY_REQUEST_TIMEOUT', '30.0')),
+    }
+    
     # MetaAPI Configuration
     METAAPI_TOKEN: str = Field(..., validation_alias='METAAPI_TOKEN')
     METAAPI_ACCOUNT_ID: Optional[str] = Field(None, validation_alias='METAAPI_ACCOUNT_ID')
@@ -194,6 +204,8 @@ class Settings(BaseSettings):
     ENABLE_API_ACCESS: bool = Field(True, validation_alias='ENABLE_API_ACCESS')
     ENABLE_WEBHOOKS: bool = Field(False, validation_alias='ENABLE_WEBHOOKS')
     ENABLE_MULTIPLE_TPS: bool = Field(True, validation_alias='ENABLE_MULTIPLE_TPS')
+    USE_GATEWAY = os.getenv('USE_GATEWAY', 'true').lower() == 'true'
+    GATEWAY_ONLY = os.getenv('GATEWAY_ONLY', 'false').lower() == 'true'
     
     # Payment Processing (if using Stripe)
     STRIPE_API_KEY: Optional[str] = Field(None, validation_alias='STRIPE_API_KEY')
