@@ -23,6 +23,7 @@ from services.cache import CacheService
 from services.queue import QueueService, AsyncTaskManager
 from services.monitoring import MonitoringService
 from database.db_persistence import DBPersistence
+from gateway_client import ExecutionProvider
 
 logger = logging.getLogger(__name__)
 class Bot:
@@ -34,8 +35,7 @@ class Bot:
         # Initialize database
         db_manager.initialize(settings.DATABASE_URL)
         self.db = db_manager.get_session()
-        # self.user_repo = UserRepository(self.db)
-
+        
         # Initialize sync services
         self.cache = CacheService()
         self.queue = QueueService()
@@ -83,6 +83,9 @@ class Bot:
         # Register all handlers NOW — before initialize() is called by run_polling()
         self._setup_middleware()
         self._setup_handlers()
+        
+        # Initialize execution provider
+        self.execution_provider = ExecutionProvider(use_gateway=USE_GATEWAY)
 
     def _setup_middleware(self):
         self.application.add_error_handler(self.error_handler.handle)
@@ -176,7 +179,7 @@ class Bot:
     async def _post_init(self, application):
         """Called by PTB after event loop starts — safe for async init only"""
         logger.info("Initializing async services...")
-
+       
         # MetaApi requires a running event loop
         self.mt5_manager = MT5ConnectionManager(self.db)
         await self.mt5_manager.start()
@@ -192,9 +195,12 @@ class Bot:
         else:
         	logger.info("MT5 connection manager is ready")
         	
+        	# Initialize execution provider
+        	await self.execution_provider.initialize(GATEWAY_CONFIG)
+        	
         	# Inject shared mt5_manager into handlers that need it
-        	self.registration.mt5_manager = self.mt5_manager
-        	self.trading.mt5_manager = self.mt5_manager
+        	self.registration.execution_provider = self.execution_provider
+        	self.trading.execution_provider = self.execution_provider
         	self.trading.mt5_manager_ready.set()
         	
         	if hasattr(self.trading, 'trade_executor') and self.trading.trade_executor:

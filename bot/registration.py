@@ -18,18 +18,28 @@ logger = logging.getLogger(__name__)
  CONFIRM_CREDENTIALS, VERIFYING, COMPLETE) = range(6)
 
 class RegistrationHandler:
-    """
-    Handles user registration flow
-    """
-    
     def __init__(self, db_session: Session, bot, mt5_manager=None):
         self.db = db_session
         self.bot = bot
         self.user_repo = UserRepository(db_session)
         self.auth_service = AuthService(db_session)
         self.encryption = EncryptionService()
+        
+        # Initialize execution provider
+        self.execution_provider = ExecutionProvider(use_gateway=True)
+        
+        # Keep reference to original mt5_manager for fallback
         self.mt5_manager = mt5_manager
-        self.notification = NotificationService(db_session, bot)
+        
+        # Gateway config
+        self.gateway_config = GatewayConfig(
+            host=GATEWAY_CONFIG['host'],
+            port=GATEWAY_CONFIG['port'],
+            api_key_header=GATEWAY_CONFIG.get('api_key_header', 'X-API-Key')
+    
+    async def initialize(self):
+        """Initialize the execution provider"""
+        await self.execution_provider.initialize(self.gateway_config)
     
     async def start(self, update: Update, context: CallbackContext) -> int:
         """Start the registration process"""
@@ -151,18 +161,15 @@ class RegistrationHandler:
             return ConversationHandler.END
     
     async def _verify_credentials(self, update: Update, context: CallbackContext) -> int:
-        """Verify credentials with MT5"""
+        """Verify credentials with both systems"""
         user_id = update.effective_user.id
-        
-        # Get credentials
         account = context.user_data['mt5_account']
         password = context.user_data['mt5_password']
         server = context.user_data['mt5_server']
         
-        # Encrypt password for storage
         encrypted_password = self.encryption.encrypt(password)
-
-        # Create or update the user row FIRST so mt5_manager can always find it
+        
+        # Create user in database first
         existing = self.user_repo.get_by_telegram_id(user_id)
         if existing:
             self.user_repo.update_user(
@@ -170,7 +177,7 @@ class RegistrationHandler:
                 mt5_account_id=account,
                 mt5_password=encrypted_password,
                 mt5_server=server,
-                is_verified=False,   # will be set True on success below
+                is_verified=False,
                 mt_connected=False
             )
         else:
@@ -185,17 +192,14 @@ class RegistrationHandler:
                 is_verified=False,
                 mt_connected=False
             )
-
-        # Attempt connection — user row now guaranteed to exist
-        success, message = await self.mt5_manager.connect_user(
-            user_id=user_id,
-            mt5_account=account,
-            mt5_password=encrypted_password,
-            mt5_server=server
+        
+        # Register with execution provider
+        success, message = await self.execution_provider.register_user(
+            user_id, account, password, server
         )
         
         if success:
-            # Mark user as verified and connected
+            # Update user status
             self.user_repo.update_user(
                 user_id,
                 is_verified=True,
@@ -226,11 +230,8 @@ class RegistrationHandler:
             return COMPLETE
         else:
             # Verification failed
-            query = update.callback_query
-            await query.edit_message_text(
-                f"❌ *Verification failed*\n\n"
-                f"Error: {message}\n\n"
-                "Please check your credentials and try again with /register.",
+            await update.callback_query.edit_message_text(
+                f"❌ *Verification failed*\n\nError: {message}",
                 parse_mode=ParseMode.MARKDOWN
             )
             
