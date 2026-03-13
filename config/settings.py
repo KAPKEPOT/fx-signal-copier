@@ -27,13 +27,47 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(False, validation_alias='DEBUG')
     
     # Gateway settings
-    GATEWAY_CONFIG = {
-        'host': os.getenv('GATEWAY_HOST', 'localhost'),
-        'port': int(os.getenv('GATEWAY_PORT', '8080')),
-        'use_ssl': os.getenv('GATEWAY_USE_SSL', 'false').lower() == 'true',
-        'api_key_header': os.getenv('GATEWAY_API_KEY_HEADER', 'X-API-Key'),
-        'connect_timeout': float(os.getenv('GATEWAY_CONNECT_TIMEOUT', '10.0')),
-        'request_timeout': float(os.getenv('GATEWAY_REQUEST_TIMEOUT', '30.0')),
+    GATEWAY_HOST: str = Field(
+        default="localhost",
+        validation_alias="GATEWAY_HOST"
+    )
+    GATEWAY_PORT: int = Field(
+        default=8080,
+        validation_alias="GATEWAY_PORT",
+        ge=1,
+        le=65535
+    )
+    GATEWAY_USE_SSL: bool = Field(
+        default=False,
+        validation_alias="GATEWAY_USE_SSL"
+    )
+    GATEWAY_API_KEY_HEADER: str = Field(
+        default="X-API-Key",
+        validation_alias="GATEWAY_API_KEY_HEADER"
+    )
+    GATEWAY_CONNECT_TIMEOUT: float = Field(
+        default=10.0,
+        validation_alias="GATEWAY_CONNECT_TIMEOUT",
+        gt=0
+    )
+    GATEWAY_REQUEST_TIMEOUT: float = Field(
+        default=30.0,
+        validation_alias="GATEWAY_REQUEST_TIMEOUT",
+        gt=0
+    )
+    
+    # Optional: Add a computed property for the full config dict
+    @property
+    def gateway_config(self) -> Dict[str, Any]:
+        """Get gateway configuration as a dictionary"""
+        return {
+            'host': self.GATEWAY_HOST,
+            'port': self.GATEWAY_PORT,
+            'use_ssl': self.GATEWAY_USE_SSL,
+            'api_key_header': self.GATEWAY_API_KEY_HEADER,
+            'connect_timeout': self.GATEWAY_CONNECT_TIMEOUT,
+            'request_timeout': self.GATEWAY_REQUEST_TIMEOUT,
+        }
     }
     
     # MetaAPI Configuration
