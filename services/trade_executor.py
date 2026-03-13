@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from core.models import TradeSignal, CalculatedTrade
 from services.signal_processor import SignalProcessor
+from core.parser import SignalParser
 from services.mt5_manager import MT5ConnectionManager
 from services.risk_service import RiskService
 from services.subscription import SubscriptionService
