@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     )
     
     @property
-    def gateway_config(self) -> GatewayConfig:
+    def gateway_config(self) -> 'GatewayConfig':
         """Get gateway configuration as a GatewayConfig object"""
         from gateway_client import GatewayConfig
         return GatewayConfig(
