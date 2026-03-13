@@ -10,6 +10,8 @@ from services.auth import AuthService, EncryptionService
 from services.mt5_manager import MT5ConnectionManager
 from services.notification import NotificationService
 from core.validators import CredentialsValidator
+from gateway_client import ExecutionProvider, GatewayConfig
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
