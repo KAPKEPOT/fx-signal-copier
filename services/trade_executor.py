@@ -243,9 +243,18 @@ class TradeExecutor:
         except Exception as e:
             logger.error(f"Trade execution failed for user {user_id}: {e}", exc_info=True)
             
+            # Create a NEW session for error logging
+            from database.database import db_manager
+            error_session = db_manager.get_session()
+            
             # Save failed trade
             try:
-                user = self.user_repo.get_by_telegram_id(user_id)
+                # Use a fresh repository with new session
+                from database.repositories import UserRepository, TradeRepository
+                user_repo = UserRepository(error_session)
+                trade_repo = TradeRepository(error_session)
+                
+                user = user_repo.get_by_telegram_id(user_id)
                 if user:
                 	failed_trade = Trade(
                 	    user_id=user.id,
@@ -262,17 +271,24 @@ class TradeExecutor:
                 	    error_message=str(e)[:500],
                 	    signal_text=signal_text
                 	)
-                	self.db.add(failed_trade)
+                	error_session.add(failed_trade)
+                	error_session.commit()
+                	logger.info(f"Failed trade logged for user {user_id}")
                 	self.db.commit()
             except Exception as db_error:
             	logger.error(f"Failed to save failed trade: {db_error}")
-            except:
-                pass
+            	error_session.rollback()
+            finally:
+            	error_session.close()
             
-            # Send error notification
-            await self.notification.notify_trade_failed(user_id, str(e), {
-                'signal': signal_text[:100]
-            })
+            # Send error notification (this will use its own session internally)
+            try:
+            	await self.notification.notify_trade_failed(user_id, str(e), {
+            	    'signal': signal_text[:100]
+            	})
+            except Exception as notify_error:
+                logger.error(f"Failed to send error notification: {notify_error}")
+               # pass
             
             return {
                 'success': False,
