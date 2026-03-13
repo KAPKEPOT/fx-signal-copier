@@ -6,7 +6,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from core.models import TradeSignal, CalculatedTrade
-from core.parser import SignalParser
+from services.signal_processor import SignalProcessor
 from services.mt5_manager import MT5ConnectionManager
 from services.risk_service import RiskService
 from services.subscription import SubscriptionService
@@ -32,8 +32,9 @@ class TradeExecutor:
         self.bot = bot
         
         # Initialize services
-        #self.signal_processor = SignalProcessor()
+        self.signal_processor = SignalProcessor()
         self.signal_processor = SignalParser()
+        
         self.risk_service = RiskService()
         self.sub_service = SubscriptionService(db_session)
         self.notification = NotificationService(db_session, bot)
@@ -66,7 +67,7 @@ class TradeExecutor:
         try:
             # Step 1: Parse signal
             logger.info(f"Parsing signal for user {user_id}")
-            signal = self.signal_processor.process(signal_text)
+            signal = self.signal_processor.parse(signal_text)
             
             # Step 2: Check subscription limits
             can_trade, limit_info = self.sub_service.check_trade_limit(user_id)
@@ -247,23 +248,25 @@ class TradeExecutor:
             
             # Save failed trade
             try:
-                failed_trade = Trade(
-                    user_id=self.user_repo.get_by_telegram_id(user_id).id,
-                    order_type='unknown',
-                    symbol='unknown',
-                    entry_price=0,
-                    stop_loss=0,
-                    take_profits=[0],
-                    position_size=0,
-                    risk_percentage=0,
-                    risk_amount=0,
-                    potential_reward=0,
-                    status='failed',
-                    error_message=str(e)[:500],
-                    signal_text=signal_text
-                )
-                self.db.add(failed_trade)
-                self.db.commit()
+                user = self.user_repo.get_by_telegram_id(user_id)
+                if user:
+                	failed_trade = Trade(
+                	    user_id=user.id,
+                	    order_type='unknown',
+                	    symbol='unknown',
+                	    entry_price=0,
+                	    stop_loss=0,
+                	    take_profits=[0],
+                	    position_size=0,
+                	    risk_percentage=0,
+                	    risk_amount=0,
+                	    potential_reward=0,
+                	    status='failed',
+                	    error_message=str(e)[:500],
+                	    signal_text=signal_text
+                	)
+                	self.db.add(failed_trade)
+                	self.db.commit()
             except:
                 pass
             
