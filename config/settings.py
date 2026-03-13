@@ -68,7 +68,6 @@ class Settings(BaseSettings):
             'connect_timeout': self.GATEWAY_CONNECT_TIMEOUT,
             'request_timeout': self.GATEWAY_REQUEST_TIMEOUT,
         }
-    }
     
     # MetaAPI Configuration
     METAAPI_TOKEN: str = Field(..., validation_alias='METAAPI_TOKEN')
