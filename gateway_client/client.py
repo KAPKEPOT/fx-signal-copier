@@ -556,28 +556,23 @@ class GatewayClient:
             return False
     
     # ==================== WebSocket ====================
-    
     async def get_symbol_info(self, symbol: str) -> Dict[str, Any]:
-    	"""
-        Get symbol information from gateway.
-        Returns symbol details including current price data.
-        """
-        if not self.http_client:
-        	raise GatewayError("Client not started")
-        	
-        try:
-        	response = await self.http_client.get(
+    	"""Get symbol information from gateway. Returns symbol details including current price data."""
+    	if not self.http_client:
+    		raise GatewayError("Client not started")
+    	
+    	try:
+    		response = await self.http_client.get(
         	    f"/api/symbols/{symbol}",
         	    headers=self._get_headers()
         	)
-        	response.raise_for_status()
-        	return response.json()
-        except httpx.HTTPStatusError as e:
-        	if e.response.status_code == 401:
-        		raise AuthenticationError("Invalid API key")
-        		logger.error(f"Failed to get symbol info: {e}")
-        		raise GatewayError(f"Symbol info failed: {e.response.text}")
-    
+    		response.raise_for_status()
+    		return response.json()
+    	except httpx.HTTPStatusError as e:
+    		if e.response.status_code == 401:
+    			raise AuthenticationError("Invalid API key")
+    			logger.error(f"Failed to get symbol info: {e}")
+    			raise GatewayError(f"Symbol info failed: {e.response.text}")
     async def connect_websocket(self):
         """Establish WebSocket connection for real-time data"""
         if self.ws_connection and not self.ws_connection.closed:
