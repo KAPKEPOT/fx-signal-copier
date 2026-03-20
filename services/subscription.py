@@ -132,6 +132,22 @@ class SubscriptionService:
         
         return True, "OK"
     
+    def check_symbol_limit(self, user_id: int, current_symbols: int) -> Tuple[bool, str]:
+    	"""Check if user can subscribe to more symbols"""
+    	plan = self.get_user_plan(user_id)
+    	
+    	if plan.max_symbols == 0:
+    		# 0 = unlimited
+    		return True, "OK"
+    	
+    	if current_symbols >= plan.max_symbols:
+    		return False, (
+    		    f"Symbol limit reached ({plan.max_symbols} for {plan.tier} plan). "
+    		    "Upgrade to add more symbols."
+    		)
+    	return True, "OK"
+                          
+    	
     def check_feature_access(self, user_id: int, feature: str) -> bool:
         """Check if user has access to a specific feature"""
         plan = self.get_user_plan(user_id)
@@ -206,6 +222,19 @@ class SubscriptionService:
         
         self.db.commit()
         
+        # Cache plan features on user for quick access
+        user.subscription_features = {
+            'max_trades': plan.max_trades_per_day,
+            'max_position_size': float(plan.max_position_size),
+            'max_symbols': plan.max_symbols,
+            'multiple_tps': plan.supports_multiple_tps,
+            'auto_trading': plan.supports_auto_trading,
+            'api_access': plan.supports_api,
+            'max_connections': plan.max_connections,
+            'rate_limit': plan.rate_limit_per_second
+        }
+        self.db.commit()
+        
         logger.info(f"User {user_id} upgraded from {old_plan} to {plan_tier} ({billing_period})")
         
         return {
@@ -237,6 +266,17 @@ class SubscriptionService:
         user.subscription_expiry = None
         
         self.db.commit()
+        
+        user.subscription_features = {
+            'max_trades': 10,
+            'max_position_size': 1.0,
+            'max_symbols': 10,
+            'multiple_tps': False,
+            'auto_trading': False,
+            'api_access': False,
+            'max_connections': 1,
+            'rate_limit': 1
+        }
         
         logger.info(f"User {user_id} downgraded from {old_plan} to free: {reason}")
         
@@ -272,19 +312,46 @@ class SubscriptionService:
             User.subscription_expiry < datetime.utcnow()
         ).all()
     
-    def process_expired(self) -> int:
-        """Process all expired subscriptions and downgrade to free"""
-        expired = self.get_expired()
-        count = 0
-        
-        for user in expired:
-            try:
-                self.downgrade_user(user.telegram_id, "expired")
-                count += 1
-            except Exception as e:
-                logger.error(f"Failed to downgrade user {user.telegram_id}: {e}")
-        
-        return count
+    def process_expired(self, notification_service=None) -> int:
+    	"""Process all expired subscriptions, downgrade to free, and notify users"""
+    	expired = self.get_expired()
+    	count = 0
+    	
+    	for user in expired:
+    		try:
+    			old_plan = user.subscription_tier
+    			self.downgrade_user(user.telegram_id, "expired")
+    			count += 1
+    			
+    			# Send notification if service is available
+    			if notification_service:
+    				import asyncio
+    				try:
+    					loop = asyncio.get_event_loop()
+    					if loop.is_running():
+    						asyncio.ensure_future(
+    						    notification_service.send_telegram(
+    						        user.telegram_id,
+    						        notification_service.templates['subscription_expired'].format(
+    						            plan=old_plan
+    						        )
+    						    )
+    						)
+    					else:
+    						loop.run_until_complete(
+    						    notification_service.send_telegram(
+    						        user.telegram_id,
+    						        notification_service.templates['subscription_expired'].format(
+    						            plan=old_plan
+    						        )
+    						    )
+    						)
+    				except Exception as notify_err:
+    					logger.error(f"Failed to notify user {user.telegram_id} of expiry: {notify_err}")
+    		except Exception as e:
+    			logger.error(f"Failed to downgrade user {user.telegram_id}: {e}")
+    	
+    	return count
     
     def get_usage_stats(self, user_id: int) -> Dict[str, Any]:
     	"""Get usage statistics for user"""
