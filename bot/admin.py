@@ -84,15 +84,15 @@ class AdminHandler:
         action = query.data.replace('admin_', '')
         
         if action == 'users':
-            return self._show_user_management(update, context)
+            return await self._show_user_management(update, context)
         elif action == 'broadcast':
-            return self._start_broadcast(update, context)
+            return await self._start_broadcast(update, context)
         elif action == 'stats':
-            return self._show_system_stats(update, context)
+            return await self._show_system_stats(update, context)
         elif action == 'alerts':
-            return self._show_alerts(update, context)
+            return await self._show_alerts(update, context)
         elif action == 'back':
-            return self.dashboard(update, context)
+            return await self.dashboard(update, context)
         elif action == 'close':
             await query.edit_message_text("👑 Admin session ended.")
             return ConversationHandler.END
@@ -129,25 +129,25 @@ class AdminHandler:
         action = query.data.replace('user_', '')
         
         if action == 'back':
-            return self.dashboard(update, context)
+            return await self.dashboard(update, context)
         
         # Parse user selection
         if action.startswith('select_'):
             user_id = int(action.replace('select_', ''))
             context.user_data['selected_user'] = user_id
-            return self._show_user_details(update, context)
+            return await self._show_user_details(update, context)
         
         elif action.startswith('ban_'):
             user_id = int(action.replace('ban_', ''))
             context.user_data['selected_user'] = user_id
             context.user_data['pending_action'] = 'ban'
-            return self._confirm_action(update, context, "ban this user")
+            return await self._confirm_action(update, context, "ban this user")
         
         elif action.startswith('unban_'):
             user_id = int(action.replace('unban_', ''))
             self.user_repo.update_user(user_id, is_banned=False)
             await query.edit_message_text(f"✅ User {user_id} unbanned.")
-            return self._show_user_management(update, context)
+            return await self._show_user_management(update, context)
         
         elif action.startswith('make_admin_'):
             target_id = int(action.replace('make_admin_', ''))
@@ -230,7 +230,7 @@ class AdminHandler:
         
         if message == '/cancel':
             await update.message.reply_text("❌ Broadcast cancelled.")
-            return self.dashboard(update, context)
+            return await self.dashboard(update, context)
         
         # Store message
         context.user_data['broadcast_message'] = message
@@ -357,7 +357,7 @@ class AdminHandler:
         else:
             await query.edit_message_text("❌ Action cancelled.")
         
-        return self.dashboard(update, context)
+        return await self.dashboard(update, context)
     
     async def _execute_broadcast(self, message: str):
         """Execute broadcast to all users"""
