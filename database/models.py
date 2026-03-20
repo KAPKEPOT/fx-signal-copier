@@ -36,6 +36,10 @@ class User(Base):
     mt5_server = Column(String(100), nullable=False)
     metaapi_token = Column(Text, nullable=True)  # Optional personal token
     
+    # CMG Gateway credentials (persist across restarts)
+    gateway_user_id = Column(String(64), nullable=True, index=True)
+    gateway_api_key = Column(Text, nullable=True)
+    
     # Trading preferences
     default_risk_factor = Column(Float, default=0.01, nullable=False)
     max_position_size = Column(Float, default=10.0, nullable=False)
@@ -118,6 +122,11 @@ class User(Base):
         if not self.subscription_expiry:
             return False
         return self.subscription_expiry > datetime.utcnow() and self.subscription_tier != 'free'
+     
+    @property
+    def has_gateway_credentials(self) -> bool:
+    	"""Check if user has stored gateway credentials"""
+    	return self.gateway_user_id is not None and self.gateway_api_key is not None
     
     @property
     def win_rate(self) -> float:

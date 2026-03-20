@@ -127,6 +127,14 @@ class UserRepository(BaseRepository):
             User.is_banned == False
         ).limit(limit).all()
     
+    def get_gateway_users(self) -> List[User]:
+    	"""Get all active users that have gateway credentials stored."""
+    	return self.session.query(User).filter(
+    	    User.is_active == True,
+    	    User.gateway_user_id.isnot(None),
+    	    User.gateway_api_key.isnot(None),
+    	).all()
+    
     def get_users_needing_connection_check(self, minutes: int = 5) -> List[User]:
         """Get users whose connection hasn't been checked recently"""
         cutoff = datetime.utcnow() - timedelta(minutes=minutes)
