@@ -10,6 +10,7 @@ from database.repositories import UserRepository, TradeRepository
 from services.notification import NotificationService
 from services.subscription import SubscriptionService
 from utils.formatters import format_balance, format_positions, format_trade_history
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
