@@ -198,6 +198,9 @@ class Bot:
         	# Initialize execution provider
         	await self.execution_provider.initialize(settings.gateway_config)
         	
+        	# Load stored gateway credentials for existing users
+        	self._load_gateway_credentials()
+        	
         	# Inject shared mt5_manager into handlers that need it
         	self.registration.execution_provider = self.execution_provider
         	self.trading.execution_provider = self.execution_provider
@@ -480,7 +483,29 @@ class Bot:
                     "Please check your credentials in /settings",
                     parse_mode='Markdown'
                 )
-
+    def _load_gateway_credentials(self):
+    	"""Load stored gateway credentials from database into GatewayManager"""
+    	if not self.execution_provider or not self.execution_provider.gateway_manager:
+    		return
+    		
+    	from database.repositories import UserRepository
+    	user_repo = UserRepository(self.db)
+    	gateway_users = user_repo.get_gateway_users()
+    	
+    	loaded = 0
+    	for user in gateway_users:
+    		try:
+    			self.execution_provider.gateway_manager.load_user_credentials(
+    			    telegram_id=user.telegram_id,
+    			    api_key=user.gateway_api_key,
+    			    gateway_user_id=user.gateway_user_id
+    			)
+    			loaded += 1
+    		except Exception as e:
+    			logger.warning(f"Failed to load gateway credentials for user {user.telegram_id}: {e}")
+    			
+    	logger.info(f"Loaded gateway credentials for {loaded} users")
+    	
     def run(self):
         """Start the bot — PTB manages the event loop entirely"""
         if settings.USE_WEBHOOK:

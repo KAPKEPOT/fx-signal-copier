@@ -199,17 +199,23 @@ class RegistrationHandler:
             )
         
         # Register with execution provider
-        success, message = await self.execution_provider.register_user(
+        success, message, credentials = await self.execution_provider.register_user(
             user_id, account, password, server
         )
         
         if success:
-            # Update user status
-            self.user_repo.update_user(
-                user_id,
-                is_verified=True,
-                mt_connected=True
-            )
+            # Update user status and store gateway credentials
+            update_fields = {
+                'is_verified': True,
+                'mt_connected': True,
+            }
+            
+            if credentials.get('gateway_user_id'):
+            	update_fields['gateway_user_id'] = credentials['gateway_user_id']
+            if credentials.get('gateway_api_key'):
+            	update_fields['gateway_api_key'] = credentials['gateway_api_key']
+            	
+            self.user_repo.update_user(user_id, **update_fields)
 
             # Send welcome notification
             self.notification.notify_connection_status(
