@@ -6,7 +6,7 @@ Revision ID: 009
 from alembic import op
 import sqlalchemy as sa
 
-revision = '008'
+revision = '009'
 down_revision = '008'
 
 def upgrade():
