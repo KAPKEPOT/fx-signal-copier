@@ -384,6 +384,142 @@ class GatewayClient:
             logger.error(f"MT5 connection failed: {e}")
             raise GatewayError(f"Connection failed: {e.response.text}")
     
+    #  Account Lifecycle
+    async def create_account(
+        self,
+        mt5_login: str,
+        mt5_password: str,
+        mt5_server: str,
+        region: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a trading account on the gateway.
+        Gateway encrypts credentials, provisions node, returns account_id + auth_token.
+        This replaces the old connect_mt5() flow.
+        """
+        if not self.http_client:
+            raise GatewayError("Client not started")
+
+        data = {
+            "mt5_login": mt5_login,
+            "mt5_password": mt5_password,
+            "mt5_server": mt5_server,
+        }
+        if region:
+            data["region"] = region
+
+        try:
+            response = await self.http_client.post(
+                "/api/accounts",
+                json=data,
+                headers=self._get_headers()
+            )
+            response.raise_for_status()
+            result = response.json()
+            logger.info(f"Account created: {result.get('account_id')}")
+            return result
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise AuthenticationError("Invalid API key")
+            raise GatewayError(f"Account creation failed: {e.response.text}")
+
+    async def get_accounts(self) -> List[Dict[str, Any]]:
+        """Get all trading accounts for the authenticated user"""
+        if not self.http_client:
+            raise GatewayError("Client not started")
+
+        try:
+            response = await self.http_client.get(
+                "/api/accounts",
+                headers=self._get_headers()
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("accounts", [])
+        except httpx.HTTPStatusError as e:
+            raise GatewayError(f"Failed to list accounts: {e.response.text}")
+
+    async def get_account_status(self, account_id: str) -> Dict[str, Any]:
+        """Get status of a specific trading account"""
+        if not self.http_client:
+            raise GatewayError("Client not started")
+
+        try:
+            response = await self.http_client.get(
+                f"/api/accounts/{account_id}",
+                headers=self._get_headers()
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                raise GatewayError(f"Account {account_id} not found")
+            raise GatewayError(f"Failed to get account: {e.response.text}")
+
+    async def delete_account(self, account_id: str) -> bool:
+        """Delete a trading account and deprovision its node"""
+        if not self.http_client:
+            raise GatewayError("Client not started")
+
+        try:
+            response = await self.http_client.delete(
+                f"/api/accounts/{account_id}",
+                headers=self._get_headers()
+            )
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as e:
+            raise GatewayError(f"Failed to delete account: {e.response.text}")
+
+    async def pause_account(self, account_id: str) -> bool:
+        """Pause a trading account"""
+        if not self.http_client:
+            raise GatewayError("Client not started")
+
+        try:
+            response = await self.http_client.post(
+                f"/api/accounts/{account_id}/pause",
+                headers=self._get_headers()
+            )
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as e:
+            raise GatewayError(f"Failed to pause account: {e.response.text}")
+
+    async def resume_account(self, account_id: str) -> bool:
+        """Resume a paused trading account"""
+        if not self.http_client:
+            raise GatewayError("Client not started")
+
+        try:
+            response = await self.http_client.post(
+                f"/api/accounts/{account_id}/resume",
+                headers=self._get_headers()
+            )
+            response.raise_for_status()
+            return True
+        except httpx.HTTPStatusError as e:
+            raise GatewayError(f"Failed to resume account: {e.response.text}")
+
+    async def wait_for_account_active(
+        self, account_id: str, timeout: int = 60, poll_interval: int = 3
+    ) -> bool:
+        """Poll account status until Active or timeout"""
+        import time
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                status = await self.get_account_status(account_id)
+                account_status = status.get("status", "")
+                if account_status == "active":
+                    return True
+                if account_status in ("login_failed", "deleted"):
+                    return False
+            except GatewayError:
+                pass
+            await asyncio.sleep(poll_interval)
+        return False
+    
     async def get_account_info(self) -> AccountInfo:
         """
         Get MT5 account information
