@@ -465,7 +465,7 @@ class Bot:
         user_id = update.effective_user.id
         
         from services.payment import PaymentService
-        from bot.keyboards import get_payment_pending_keyboard
+        from bot.keyboards import get_payment_pending_keyboard, get_upgrade_keyboard
         payment_service = PaymentService(self.db)
         
         # Handle billing period selection
