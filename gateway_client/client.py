@@ -8,7 +8,13 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Callable, Awaitable
 from dataclasses import dataclass, field, asdict
 from enum import Enum
-from core.exceptions import GatewayError
+from core.exceptions import (
+    GatewayError,
+    AuthenticationError,
+    GatewayConnectionError,
+    OrderError,
+    SubscriptionError,
+)
 
 import httpx
 import websockets
