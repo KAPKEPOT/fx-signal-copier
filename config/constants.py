@@ -231,7 +231,7 @@ ERROR_MESSAGES: Dict[str, str] = {
 
 # Success messages
 SUCCESS_MESSAGES: Dict[str, str] = {
-    'registered': '✅ Successfully registered! Welcome to FX Signal Copier',
+    'registered': '✅ Successfully registered! Welcome to Tonpo Bot',
     'trade_executed': '✅ Trade executed successfully!',
     'settings_updated': '✅ Settings updated successfully',
     'connection_tested': '✅ Connection test successful'
