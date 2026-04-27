@@ -3,7 +3,6 @@
 Services package for business logic
 """
 from .auth import AuthService, EncryptionService
-from .mt5_manager import MT5ConnectionManager, ConnectionPool
 from .signal_processor import SignalProcessor, SignalValidator
 from .notification import NotificationService
 from .subscription import SubscriptionService
@@ -17,8 +16,6 @@ from .monitoring import MonitoringService
 __all__ = [
     'AuthService',
     'EncryptionService',
-    'MT5ConnectionManager',
-    'ConnectionPool',
     'SignalProcessor',
     'SignalValidator',
     'NotificationService',

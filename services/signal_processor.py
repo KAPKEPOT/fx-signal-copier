@@ -81,9 +81,9 @@ class SignalValidator:
     def _get_pip_multiplier(self, symbol: str) -> float:
         """Get pip multiplier for symbol"""
         if symbol == 'XAUUSD':
-            return PIP_MULTIPLIERS['gold']
+            return PIP_MULTIPLIERS['XAUUSD']
         elif symbol == 'XAGUSD':
-            return PIP_MULTIPLIERS['silver']
+            return PIP_MULTIPLIERS['XAGUSD']   # 0.001
         elif any(jpy in symbol for jpy in JPY_SYMBOLS):
             return 0.01
         else:

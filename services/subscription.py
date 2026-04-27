@@ -7,14 +7,9 @@ from sqlalchemy.orm import Session
 from database.models import User, SubscriptionPlan
 from database.repositories import UserRepository
 from config.settings import settings
+from core.exceptions import SubscriptionError
 
 logger = logging.getLogger(__name__)
-
-
-class SubscriptionError(Exception):
-    """Raised when subscription operations fail"""
-    pass
-
 
 class SubscriptionService:
     """
