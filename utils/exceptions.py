@@ -45,6 +45,6 @@ class PermissionDeniedError(UtilityError):
     pass
 
 
-class TimeoutError(UtilityError):
+class OperationTimeoutError(UtilityError):
     """Raised when operation times out"""
     pass
