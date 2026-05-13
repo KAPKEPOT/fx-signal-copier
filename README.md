@@ -70,21 +70,12 @@ This bot uses the **[Tonpo SDK](https://github.com/TonpoLabs/tonpo-py)** to comm
 - **Telegram Bot Token** — get one from [@BotFather](https://t.me/BotFather)
 - **MT5 Account** — from any broker (demo or live account)
 
-### You Need Tonpo Running
-
-This bot uses the **Tonpo SDK** to execute trades. You need access to a running **Tonpo Gateway** instance:
-
-- See: [Tonpo Gateway Setup](https://github.com/TonpoLabs/CMG)
-- See: [Tonpo SDK (tonpo-py)](https://github.com/TonpoLabs/tonpo-py)
-
----
-
 ## Quick Start
 
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/TonpoLabs/tonpo-bot.git
+git clone https://github.com/KAPKEPOT/tonpo-bot.git
 cd tonpo-bot
 
 python -m venv venv
@@ -298,68 +289,6 @@ Trade executed in < 2 seconds
 | `WEBHOOK_MODE` | ❌ | `true` for webhooks, `false` for polling |
 | `WEBHOOK_URL` | ❌ | Public HTTPS URL for webhook mode |
 | `LOG_LEVEL` | ❌ | `DEBUG` / `INFO` / `WARNING` (default: `INFO`) |
-
----
-
-## Project Structure
-
-```
-tonpo-bot/
-├── bot/                         # Bot and command handlers
-│   ├── main.py                  # Bot initialization
-│   ├── handlers.py              # Command handlers (/start, /help, etc.)
-│   ├── registration.py          # /register conversation flow
-│   ├── trading.py               # /trade conversation flow
-│   ├── settings.py              # /settings conversation flow
-│   ├── admin.py                 # Admin dashboard
-│   ├── callbacks.py             # Inline keyboard callbacks
-│   ├── keyboards.py             # Telegram keyboards
-│   ├── middleware.py            # Auth, rate limiting, error handling
-│   └── message_utils.py         # Message editing utilities
-│
-├── gateway_client/              # Tonpo SDK integration
-│   ├── client.py                # tonpo-py SDK wrapper
-│   └── adapter.py               # Adapter layer for gateway
-│
-├── services/                    # Business logic
-│   ├── trade_executor.py        # Trade execution pipeline
-│   ├── signal_processor.py      # Signal parsing + validation
-│   ├── risk_service.py          # Position size calculation
-│   ├── payment.py               # Crypto payment processing
-│   ├── subscription.py          # Plan/quota management
-│   ├── notification.py          # Telegram notifications
-│   ├── auth.py                  # Auth + encryption
-│   ├── analytics.py             # Usage tracking
-│   ├── cache.py                 # Redis caching
-│   ├── monitoring.py            # Health + metrics
-│   └── queue.py                 # Background task queue
-│
-├── database/                    # Data access
-│   ├── models.py                # SQLAlchemy models
-│   ├── repositories.py          # Data access layer
-│   ├── database.py              # Connection management
-│   └── migrations/              # Alembic migrations
-│
-├── core/                        # Core business models
-│   ├── models.py                # TradeSignal, CalculatedTrade dataclasses
-│   ├── parser.py                # Signal text parser
-│   ├── validators.py            # Input validation
-│   └── exceptions.py            # Custom exceptions
-│
-├── config/                      # Configuration
-│   ├── settings.py              # Pydantic settings
-│   └── constants.py             # Constants, enums, multipliers
-│
-├── utils/                       # Utilities
-│   └── formatters.py            # Message formatting
-│
-├── main.py                      # Entry point
-├── Makefile                     # Development commands
-├── requirements.txt
-├── alembic.ini
-└── .env.example
-```
-
 ---
 
 ## Development
@@ -577,15 +506,8 @@ Bot:
 
 - **Documentation** — https://docs.tonpo.cloud/
 - **Tonpo SDK** — https://github.com/TonpoLabs/tonpo-py
-- **Report Issues** — https://github.com/TonpoLabs/tonpo-bot/issues
-- **Discussions** — https://github.com/TonpoLabs/tonpo-bot/discussions
-
-### Related Projects
-
-- **Tonpo Gateway** — https://github.com/TonpoLabs/CMG
-- **Tonpo SDK (Python)** — https://github.com/TonpoLabs/tonpo-py
-- **Tonpo Node Agent** — https://github.com/TonpoLabs/CNA
-
+- **Report Issues** — https://github.com/KAPKEPOT/tonpo-bot/issues
+- **Discussions** — https://github.com/KAPKEPOT/tonpo-bot/discussions
 ---
 
 ## Contributing
@@ -599,13 +521,6 @@ We welcome contributions! Please:
 5. Open a Pull Request
 
 See `CONTRIBUTING.md` for guidelines.
-
----
-
-## License
-
-Proprietary — All rights reserved. © Tonpo. Unauthorized copying, distribution, or use is strictly prohibited.
-
 ---
 
 ## Disclaimer
