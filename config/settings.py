@@ -21,8 +21,8 @@ class Settings(BaseSettings):
     )
     
     # App Info
-    APP_NAME: str = "FX Signal Copier"
-    APP_VERSION: str = "2.0.0"
+    APP_NAME: str = "Tonpo Bot"
+    APP_VERSION: str = "1.0.0"
     APP_DESCRIPTION: str = "Telegram Bot for MetaTrader 5 Trading"
     DEBUG: bool = Field(False, validation_alias='DEBUG')
     

@@ -1,533 +1,459 @@
 # fx/services/payment.py
-"""
-Crypto payment service for subscription upgrades.
+# This module handles user upgrades via crypto payments.
+# 
+# IMPORTANT: Blockchain detection is handled by Billing service.
+# This module ONLY:
+# 1. Creates payment requests in Billing
+# 2. Polls Billing for payment status
+# 3. Notifies users based on status
+# 4. Never touches blockchain directly!
 
-Supports:
-  - USDT (ERC-20 on Ethereum)
-  - BTC
-
-Uses unique amounts (base price + small offset) to identify
-which user made a payment to a single wallet address.
-
-Verification via:
-  - Etherscan API (USDT ERC-20 token transfers)
-  - Blockchain.info API (BTC transactions)
-"""
 import asyncio
 import logging
-import random
-import uuid
 from datetime import datetime, timedelta
-from decimal import Decimal, ROUND_DOWN
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Optional, Dict, Any
+from dataclasses import dataclass
+from enum import Enum
+import uuid
 
-import httpx
-from sqlalchemy.orm import Session
-from sqlalchemy import and_
+import aiohttp
+from sqlalchemy import Column, String, Integer, DateTime, Enum as SQLEnum
+from sqlalchemy.ext.declarative import declarative_base
 
-from database.models import PaymentRequest, User
-from database.repositories import UserRepository
-from services.subscription import SubscriptionService
-from config.settings import settings
-
+Base = declarative_base()
 logger = logging.getLogger(__name__)
 
-
-# Configuration
-class PaymentConfig:
-    """Payment system configuration — set via environment variables"""
-    
-    # Wallet addresses
-    USDT_WALLET: str = getattr(settings, 'USDT_WALLET_ADDRESS', '')
-    BTC_WALLET: str = getattr(settings, 'BTC_WALLET_ADDRESS', '')
-    
-    # API keys for blockchain explorers
-    ETHERSCAN_API_KEY: str = getattr(settings, 'ETHERSCAN_API_KEY', '')
-    
-    # USDT ERC-20 contract address (mainnet)
-    USDT_CONTRACT: str = '0xdAC17F958D2ee523a2206206994597C13D831ec7'
-    
-    # Payment settings
-    PAYMENT_EXPIRY_HOURS: int = 2  # How long a payment request stays valid
-    UNIQUE_OFFSET_MIN: int = 1    # Minimum cents offset
-    UNIQUE_OFFSET_MAX: int = 99   # Maximum cents offset
-    MIN_CONFIRMATIONS_ETH: int = 12
-    MIN_CONFIRMATIONS_BTC: int = 3
-    
-    # Polling
-    POLL_INTERVAL_SECONDS: int = 60
-    
-    # Amount matching tolerance (to handle network fees eating into amount)
-    AMOUNT_TOLERANCE: Decimal = Decimal('0.005')  # 0.5 cent tolerance
+# Domain Models
+class PaymentStatus(str, Enum):
+    """Payment status - mirrors Billing service states"""
+    PENDING = "pending"        # Created, waiting for user to send crypto
+    CONFIRMED = "confirmed"    # TX detected on blockchain, confirming
+    ACTIVATED = "activated"    # Enough confirmations, subscription upgraded
+    EXPIRED = "expired"        # Crypto window (2h) elapsed with no TX
+    FAILED = "failed"          # Payment failed (wrong amount, etc)
 
 
-# Payment Service
-class PaymentService:
-    """Creates and manages crypto payment requests"""
+class PaymentMethod(str, Enum):
+    """Crypto payment methods"""
+    USDT_ERC20 = "usdt_erc20"  # USDT on Ethereum
+    BTC = "btc"                # Bitcoin
+
+
+@dataclass
+class CryptoCheckoutResponse:
+    """Response from POST /checkout/crypto"""
+    payment_id: str
+    address: str
+    amount: str          # e.g., "29.900347"
+    currency: str        # "USDT" or "BTC"
+    expires_at: str      # ISO 8601 datetime
+    expires_minutes: int
+
+
+@dataclass
+class PaymentStatusResponse:
+    """Response from GET /payments/:id/status"""
+    payment_id: str
+    status: PaymentStatus
+    confirmations: int = 0
+    tx_hash: Optional[str] = None
+    confirmed_at: Optional[str] = None
+    expires_at: Optional[str] = None
+
+
+class PaymentRequest(Base):
+    """Local record of payment request (for tracking in Bot DB)"""
+    __tablename__ = "payment_requests"
     
-    def __init__(self, db_session: Session):
-        self.db = db_session
-        self.user_repo = UserRepository(db_session)
-        self.sub_service = SubscriptionService(db_session)
-        self.config = PaymentConfig()
+    id = Column(String, primary_key=True)               # UUID
+    payment_id = Column(String, unique=True, index=True) # Billing's payment_id
+    user_id = Column(String, index=True)                # Telegram user_id
+    plan_id = Column(String)                            # 'pro', 'basic', etc
+    amount_usd = Column(Integer)                        # In cents (e.g., 2990 = $29.90)
+    crypto_amount = Column(String)                      # "29.900347"
+    crypto_currency = Column(String)                    # "USDT" or "BTC"
+    address = Column(String)                            # Wallet address
+    status = Column(SQLEnum(PaymentStatus))             # Current status
+    expires_at = Column(DateTime)                       # When this request expires
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Billing Service Client
+class BillingClient:
+    """HTTP client for Billing service - handles all payment operations"""
     
-    def create_payment_request(
+    def __init__(self, billing_url: str, api_key: str, timeout: int = 10):
+        """
+        Initialize Billing client.
+        
+        Args:
+            billing_url: Base URL of Billing service (e.g., https://billing.tonpo.io)
+            api_key: API key for authentication (X-API-Key header)
+            timeout: Request timeout in seconds
+        """
+        self.billing_url = billing_url.rstrip('/')
+        self.api_key = api_key
+        self.timeout = aiohttp.ClientTimeout(total=timeout)
+    
+    async def _request(
         self,
-        user_id: int,
-        plan_tier: str,
-        billing_period: str = 'monthly',
-        currency: str = 'USDT'
+        method: str,
+        endpoint: str,
+        json_data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
+        """Make authenticated request to Billing service"""
+        url = f"{self.billing_url}{endpoint}"
+        headers = {"X-API-Key": self.api_key}
+        
+        async with aiohttp.ClientSession(timeout=self.timeout) as session:
+            async with session.request(method, url, json=json_data, headers=headers) as resp:
+                if resp.status != 200:
+                    error_body = await resp.text()
+                    raise Exception(f"Billing API error {resp.status}: {error_body}")
+                
+                return await resp.json()
+    
+    async def create_crypto_payment(
+        self,
+        user_id: str,
+        plan_id: str,
+        method: PaymentMethod
+    ) -> CryptoCheckoutResponse:
         """
-        Create a pending payment request with a unique amount.
+        POST /checkout/crypto
         
-        The unique amount = base plan price + random cents offset.
-        This offset identifies the payment when it arrives at the wallet.
+        Create a crypto payment request.
+        Billing will generate unique amount and return payment details.
+        
+        Args:
+            user_id: Telegram user ID
+            plan_id: Plan to upgrade to ('pro', 'basic', etc)
+            method: PaymentMethod.USDT_ERC20 or PaymentMethod.BTC
+        
+        Returns:
+            CryptoCheckoutResponse with payment details
         """
-        user = self.user_repo.get_by_telegram_id(user_id)
-        if not user:
-            raise ValueError("User not found")
+        logger.info(f"Creating crypto checkout: user={user_id}, plan={plan_id}, method={method}")
         
-        plan = self.sub_service.get_plan(plan_tier)
-        if not plan:
-            raise ValueError(f"Plan '{plan_tier}' not found")
-        
-        # Cancel any existing pending requests for this user
-        self._cancel_pending(user.id)
-        
-        # Get base price
-        if billing_period == 'yearly':
-            base_amount = Decimal(str(plan.price_yearly))
-        else:
-            base_amount = Decimal(str(plan.price_monthly))
-        
-        if base_amount <= 0:
-            raise ValueError("Cannot create payment for free plan")
-        
-        # Generate unique amount
-        unique_amount = self._generate_unique_amount(base_amount, currency)
-        
-        # Get wallet address and network
-        if currency.upper() in ('USDT', 'USDC'):
-            wallet = self.config.USDT_WALLET
-            network = 'ERC20'
-        elif currency.upper() == 'BTC':
-            wallet = self.config.BTC_WALLET
-            network = 'BTC'
-        else:
-            raise ValueError(f"Unsupported currency: {currency}")
-        
-        if not wallet:
-            raise ValueError(f"No wallet configured for {currency}")
-        
-        # Create payment request
-        payment = PaymentRequest(
-            uuid=str(uuid.uuid4()),
-            user_id=user.id,
-            plan_tier=plan_tier,
-            billing_period=billing_period,
-            base_amount=base_amount,
-            unique_amount=unique_amount,
-            currency=currency.upper(),
-            wallet_address=wallet,
-            network=network,
-            status='pending',
-            expires_at=datetime.utcnow() + timedelta(hours=self.config.PAYMENT_EXPIRY_HOURS)
+        response = await self._request(
+            "POST",
+            "/checkout/crypto",
+            {
+                "user_id": user_id,
+                "plan_id": plan_id,
+                "method": method.value
+            }
         )
         
-        self.db.add(payment)
+        return CryptoCheckoutResponse(
+            payment_id=response["payment_id"],
+            address=response["address"],
+            amount=response["amount"],
+            currency=response["currency"],
+            expires_at=response["expires_at"],
+            expires_minutes=response["expires_minutes"]
+        )
+    
+    async def get_payment_status(self, payment_id: str) -> PaymentStatusResponse:
+        """
+        GET /payments/:id/status
+        
+        Poll current payment status from Billing.
+        Billing updates this automatically when blockchain confirms.
+        
+        Args:
+            payment_id: Payment ID from Billing
+        
+        Returns:
+            PaymentStatusResponse with current status
+        """
+        response = await self._request("GET", f"/payments/{payment_id}/status")
+        
+        return PaymentStatusResponse(
+            payment_id=response["payment_id"],
+            status=PaymentStatus(response["status"]),
+            confirmations=response.get("confirmations", 0),
+            tx_hash=response.get("tx_hash"),
+            confirmed_at=response.get("confirmed_at"),
+            expires_at=response.get("expires_at")
+        )
+
+# Payment Manager - Handles User Upgrade Flow
+class PaymentManager:
+    """Orchestrates crypto payment flow - pure routing + polling"""
+    
+    def __init__(self, billing_client: BillingClient, db_session):
+        """
+        Args:
+            billing_client: BillingClient instance
+            db_session: SQLAlchemy session for local DB
+        """
+        self.billing = billing_client
+        self.db = db_session
+    
+    async def initiate_upgrade(
+        self,
+        user_id: str,
+        plan_id: str,
+        method: PaymentMethod = PaymentMethod.USDT_ERC20
+    ) -> CryptoCheckoutResponse:
+        """
+        Step 1: User clicks "Upgrade to Pro"
+        
+        Create crypto payment request in Billing and return payment details.
+        
+        Args:
+            user_id: Telegram user ID
+            plan_id: Target plan ('pro', 'basic', etc)
+            method: Payment method (USDT or BTC)
+        
+        Returns:
+            Payment details to show to user (address, amount, expires_at)
+        """
+        logger.info(f"Initiating upgrade: user={user_id} → {plan_id}")
+        
+        # Call Billing to create payment
+        checkout = await self.billing.create_crypto_payment(user_id, plan_id, method)
+        
+        # Store in local DB for tracking
+        payment_record = PaymentRequest(
+            id=str(uuid.uuid4()),
+            payment_id=checkout.payment_id,      # Billing's ID
+            user_id=user_id,
+            plan_id=plan_id,
+            crypto_amount=checkout.amount,
+            crypto_currency=checkout.currency,
+            address=checkout.address,
+            status=PaymentStatus.PENDING,
+            expires_at=datetime.fromisoformat(checkout.expires_at.replace('Z', '+00:00'))
+        )
+        self.db.add(payment_record)
         self.db.commit()
         
-        logger.info(
-            f"Payment request created: user={user_id}, plan={plan_tier}, "
-            f"amount={unique_amount} {currency}, expires={payment.expires_at}"
-        )
+        logger.info(f"Payment created: {checkout.payment_id}, expires in {checkout.expires_minutes}m")
         
-        return {
-            'payment_id': payment.uuid,
-            'amount': str(unique_amount),
-            'currency': currency.upper(),
-            'wallet_address': wallet,
-            'network': network,
-            'plan': plan_tier,
-            'billing_period': billing_period,
-            'expires_at': payment.expires_at.isoformat(),
-            'expires_in_minutes': self.config.PAYMENT_EXPIRY_HOURS * 60
-        }
+        return checkout
     
-    def _generate_unique_amount(self, base_amount: Decimal, currency: str) -> Decimal:
+    async def monitor_payment(
+        self,
+        payment_id: str,
+        user_id: str,
+        notification_callback
+    ) -> bool:
         """
-        Generate a unique amount by adding a random cents offset.
-        Ensures no other pending payment has the same amount.
+        Step 2: Monitor payment status (polling)
+        
+        Poll Billing's /payments/:id/status endpoint until payment completes.
+        Billing's background job handles blockchain detection automatically.
+        
+        This function just asks Billing: "Is it done yet?"
+        
+        Args:
+            payment_id: Payment ID from Billing
+            user_id: Telegram user ID (for logging)
+            notification_callback: async function(status, confirmations, message)
+        
+        Returns:
+            True if payment activated, False if expired/failed
         """
-        max_attempts = 50
+        logger.info(f"Monitoring payment {payment_id} for user {user_id}")
         
-        for _ in range(max_attempts):
-            # Random offset between 1 and 99 cents
-            offset_cents = random.randint(
-                self.config.UNIQUE_OFFSET_MIN,
-                self.config.UNIQUE_OFFSET_MAX
-            )
-            
-            if currency.upper() == 'BTC':
-                # For BTC, use satoshi-level offset (0.00000001 - 0.00000099)
-                offset = Decimal(str(offset_cents)) / Decimal('100000000')
-            else:
-                # For USDT/USDC, use cent-level offset
-                offset = Decimal(str(offset_cents)) / Decimal('100')
-            
-            unique_amount = (base_amount + offset).quantize(
-                Decimal('0.0001') if currency.upper() == 'BTC' else Decimal('0.01'),
-                rounding=ROUND_DOWN
-            )
-            
-            # Check no other pending payment has this exact amount
-            existing = self.db.query(PaymentRequest).filter(
-                and_(
-                    PaymentRequest.unique_amount == unique_amount,
-                    PaymentRequest.currency == currency.upper(),
-                    PaymentRequest.status == 'pending',
-                    PaymentRequest.expires_at > datetime.utcnow()
-                )
-            ).first()
-            
-            if not existing:
-                return unique_amount
+        max_polls = 120  # 2 hours (120 * 60 sec = 2 hours, polling every 60 sec)
+        poll_count = 0
+        last_confirmations = 0
         
-        # Fallback: use timestamp-based offset
-        ts_offset = Decimal(str(int(datetime.utcnow().timestamp()) % 100)) / Decimal('100')
-        return base_amount + ts_offset
-    
-    def _cancel_pending(self, user_id_db: int):
-        """Cancel all pending payment requests for a user"""
-        pending = self.db.query(PaymentRequest).filter(
-            and_(
-                PaymentRequest.user_id == user_id_db,
-                PaymentRequest.status == 'pending'
-            )
-        ).all()
-        
-        for p in pending:
-            p.status = 'cancelled'
-        
-        if pending:
-            self.db.commit()
-            logger.info(f"Cancelled {len(pending)} pending payments for user_id={user_id_db}")
-    
-    def get_pending_payment(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Get user's current pending payment, if any"""
-        user = self.user_repo.get_by_telegram_id(user_id)
-        if not user:
-            return None
-        
-        payment = self.db.query(PaymentRequest).filter(
-            and_(
-                PaymentRequest.user_id == user.id,
-                PaymentRequest.status == 'pending',
-                PaymentRequest.expires_at > datetime.utcnow()
-            )
-        ).first()
-        
-        if not payment:
-            return None
-        
-        return {
-            'payment_id': payment.uuid,
-            'amount': str(payment.unique_amount),
-            'currency': payment.currency,
-            'wallet_address': payment.wallet_address,
-            'network': payment.network,
-            'plan': payment.plan_tier,
-            'billing_period': payment.billing_period,
-            'expires_at': payment.expires_at.isoformat(),
-            'minutes_left': max(0, int((payment.expires_at - datetime.utcnow()).total_seconds() / 60))
-        }
-    
-    def expire_stale_payments(self) -> int:
-        """Mark expired pending payments as expired"""
-        expired = self.db.query(PaymentRequest).filter(
-            and_(
-                PaymentRequest.status == 'pending',
-                PaymentRequest.expires_at < datetime.utcnow()
-            )
-        ).all()
-        
-        for p in expired:
-            p.status = 'expired'
-        
-        if expired:
-            self.db.commit()
-        
-        return len(expired)
+        while poll_count < max_polls:
+            try:
+                # Ask Billing: What's the status?
+                status = await self.billing.get_payment_status(payment_id)
+                
+                # Update local DB
+                self._update_payment_status(payment_id, status.status)
 
-
-
-# Blockchain Watcher
-class BlockchainWatcher:
-    """
-    Polls blockchain APIs to detect incoming payments.
-    Matches transactions to pending PaymentRequests by unique amount.
-    """
-    
-    def __init__(self, db_session: Session, notification_service=None):
-        self.db = db_session
-        self.notification = notification_service
-        self.sub_service = SubscriptionService(db_session)
-        self.config = PaymentConfig()
-        self.http_client: Optional[httpx.AsyncClient] = None
-        
-        # Track last checked block/timestamp to avoid re-scanning
-        self._last_eth_block: Optional[int] = None
-        self._last_btc_timestamp: Optional[int] = None
-    
-    async def start(self):
-        """Start the HTTP client"""
-        self.http_client = httpx.AsyncClient(timeout=30.0)
-    
-    async def stop(self):
-        """Stop the HTTP client"""
-        if self.http_client:
-            await self.http_client.aclose()
-    
-    async def check_payments(self):
-        """
-        Main polling method — called by background task.
-        Checks for new transactions matching pending payments.
-        """
-        if not self.http_client:
-            await self.start()
-        
-        # Expire stale payments first
-        payment_service = PaymentService(self.db)
-        expired_count = payment_service.expire_stale_payments()
-        if expired_count > 0:
-            logger.info(f"Expired {expired_count} stale payment requests")
-        
-        # Get all pending payments
-        pending = self.db.query(PaymentRequest).filter(
-            and_(
-                PaymentRequest.status == 'pending',
-                PaymentRequest.expires_at > datetime.utcnow()
-            )
-        ).all()
-        
-        if not pending:
-            return
-        
-        # Group by currency
-        usdt_pending = [p for p in pending if p.currency == 'USDT']
-        btc_pending = [p for p in pending if p.currency == 'BTC']
-        
-        if usdt_pending and self.config.USDT_WALLET:
-            await self._check_usdt_payments(usdt_pending)
-        
-        if btc_pending and self.config.BTC_WALLET:
-            await self._check_btc_payments(btc_pending)
-    
-    # ==================== USDT (ERC-20) ====================
-    
-    async def _check_usdt_payments(self, pending: List[PaymentRequest]):
-        """Check Etherscan for USDT transfers to our wallet"""
-        if not self.config.ETHERSCAN_API_KEY:
-            logger.warning("Etherscan API key not configured, skipping USDT check")
-            return
-        
-        try:
-            # Get recent ERC-20 token transfers to our wallet
-            params = {
-                'module': 'account',
-                'action': 'tokentx',
-                'contractaddress': self.config.USDT_CONTRACT,
-                'address': self.config.USDT_WALLET,
-                'page': 1,
-                'offset': 50,  # Last 50 transfers
-                'sort': 'desc',
-                'apikey': self.config.ETHERSCAN_API_KEY
-            }
-            
-            response = await self.http_client.get(
-                'https://api.etherscan.io/api',
-                params=params
-            )
-            data = response.json()
-            
-            if data.get('status') != '1' or not data.get('result'):
-                return
-            
-            transactions = data['result']
-            
-            for tx in transactions:
-                # Only incoming transfers (to our wallet)
-                if tx['to'].lower() != self.config.USDT_WALLET.lower():
+                # Handle Status Changes
+                if status.status == PaymentStatus.PENDING:
+                    # Still waiting for user to send crypto
+                    message = "⏳ Waiting for payment..."
+                    await notification_callback(
+                        status=status.status,
+                        confirmations=0,
+                        message=message
+                    )
+                
+                elif status.status == PaymentStatus.CONFIRMED:
+                    # Blockchain found the TX! Counting confirmations.
+                    confirmations = status.confirmations or 0
+                    
+                    # Only notify on confirmation change
+                    if confirmations != last_confirmations:
+                        message = f"⏳ Payment detected! {confirmations}/12 confirmations"
+                        await notification_callback(
+                            status=status.status,
+                            confirmations=confirmations,
+                            message=message
+                        )
+                        last_confirmations = confirmations
+                    
+                    # Keep polling until 12 confirmations
+                    await asyncio.sleep(60)  # Poll every 60 seconds
+                    poll_count += 1
                     continue
                 
-                # USDT has 6 decimals
-                amount = Decimal(tx['value']) / Decimal('1000000')
-                tx_hash = tx['hash']
-                confirmations = int(tx.get('confirmations', 0))
-                block_number = int(tx.get('blockNumber', 0))
-                
-                # Match against pending payments
-                await self._match_payment(
-                    pending, amount, tx_hash, confirmations,
-                    block_number, self.config.MIN_CONFIRMATIONS_ETH
-                )
-                
-        except Exception as e:
-            logger.error(f"Etherscan API error: {e}")
-    
-    # ==================== BTC ====================
-    
-    async def _check_btc_payments(self, pending: List[PaymentRequest]):
-        """Check Blockchain.info for BTC payments to our wallet"""
-        try:
-            response = await self.http_client.get(
-                f'https://blockchain.info/rawaddr/{self.config.BTC_WALLET}',
-                params={'limit': 20}
-            )
-            data = response.json()
-            
-            transactions = data.get('txs', [])
-            
-            for tx in transactions:
-                tx_hash = tx['hash']
-                block_height = tx.get('block_height')
-                latest_block = data.get('latest_block', {}).get('height', 0)
-                
-                if block_height:
-                    confirmations = latest_block - block_height + 1
-                else:
-                    confirmations = 0
-                
-                # Sum outputs to our address
-                total_received = Decimal('0')
-                for output in tx.get('out', []):
-                    if output.get('addr') == self.config.BTC_WALLET:
-                        # BTC amount is in satoshis
-                        total_received += Decimal(str(output['value'])) / Decimal('100000000')
-                
-                if total_received > 0:
-                    await self._match_payment(
-                        pending, total_received, tx_hash, confirmations,
-                        block_height or 0, self.config.MIN_CONFIRMATIONS_BTC
+                elif status.status == PaymentStatus.ACTIVATED:
+                    # 🎉 Payment complete! Subscription upgraded!
+                    message = "✅ Pro plan activated! You can now trade with full features."
+                    await notification_callback(
+                        status=status.status,
+                        confirmations=status.confirmations or 12,
+                        message=message
                     )
-                    
-        except Exception as e:
-            logger.error(f"Blockchain.info API error: {e}")
-    
-    # ==================== Payment Matching ====================
-    
-    async def _match_payment(
-        self,
-        pending: List[PaymentRequest],
-        amount: Decimal,
-        tx_hash: str,
-        confirmations: int,
-        block_number: int,
-        min_confirmations: int
-    ):
-        """Match a blockchain transaction to a pending payment request"""
-        
-        # Check if this TX was already processed
-        existing = self.db.query(PaymentRequest).filter(
-            PaymentRequest.tx_hash == tx_hash
-        ).first()
-        if existing:
-            # Update confirmations if already matched
-            if existing.status == 'confirmed' and confirmations >= min_confirmations:
-                await self._activate_payment(existing)
-            elif existing.confirmations != confirmations:
-                existing.confirmations = confirmations
-                self.db.commit()
-            return
-        
-        # Find matching pending payment by amount (within tolerance)
-        tolerance = self.config.AMOUNT_TOLERANCE
-        
-        for payment in pending:
-            expected = Decimal(str(payment.unique_amount))
+                    logger.info(f"Payment {payment_id} activated for user {user_id}")
+                    return True
+                
+                elif status.status == PaymentStatus.EXPIRED:
+                    # ❌ User didn't send crypto in time
+                    message = "❌ Payment window expired (2 hours). Please try again."
+                    await notification_callback(
+                        status=status.status,
+                        confirmations=0,
+                        message=message
+                    )
+                    logger.warning(f"Payment {payment_id} expired for user {user_id}")
+                    return False
+                
+                elif status.status == PaymentStatus.FAILED:
+                    # ❌ Payment failed (wrong amount, etc)
+                    message = "❌ Payment failed. Please contact support."
+                    await notification_callback(
+                        status=status.status,
+                        confirmations=0,
+                        message=message
+                    )
+                    logger.error(f"Payment {payment_id} failed for user {user_id}")
+                    return False
+                
+                # Wait before next poll
+                await asyncio.sleep(60)  # Poll every 60 seconds
+                poll_count += 1
             
-            if abs(amount - expected) <= tolerance:
-                # Match found
-                logger.info(
-                    f"Payment matched: tx={tx_hash[:16]}..., "
-                    f"amount={amount}, expected={expected}, "
-                    f"user_id={payment.user_id}, plan={payment.plan_tier}"
+            except Exception as e:
+                logger.error(f"Error monitoring payment {payment_id}: {e}")
+                await notification_callback(
+                    status=PaymentStatus.FAILED,
+                    confirmations=0,
+                    message=f"❌ Error checking payment status: {str(e)}"
                 )
-                
-                payment.tx_hash = tx_hash
-                payment.confirmed_amount = amount
-                payment.confirmations = confirmations
-                payment.block_number = block_number
-                payment.confirmed_at = datetime.utcnow()
-                
-                if confirmations >= min_confirmations:
-                    await self._activate_payment(payment)
-                else:
-                    payment.status = 'confirmed'
-                    self.db.commit()
-                    
-                    # Notify user that payment is seen but awaiting confirmations
-                    if self.notification:
-                        user = self.db.query(User).filter(User.id == payment.user_id).first()
-                        if user:
-                            await self.notification.send_telegram(
-                                user.telegram_id,
-                                f"⏳ *Payment Detected*\n\n"
-                                f"We see your payment of {amount} {payment.currency}.\n"
-                                f"Waiting for {min_confirmations} confirmations "
-                                f"({confirmations} so far).\n\n"
-                                f"Your {payment.plan_tier.title()} plan will activate automatically."
-                            )
-                
-                return  # Only match one payment per TX
+                await asyncio.sleep(60)
+                poll_count += 1
+        
+        # Timeout
+        logger.warning(f"Payment {payment_id} monitoring timeout for user {user_id}")
+        return False
     
-    async def _activate_payment(self, payment: PaymentRequest):
-        """Activate subscription after payment is fully confirmed"""
-        if payment.status == 'activated':
-            return
+    def _update_payment_status(self, payment_id: str, status: PaymentStatus) -> None:
+        """Update local payment record status"""
+        payment = self.db.query(PaymentRequest)\
+            .filter(PaymentRequest.payment_id == payment_id)\
+            .first()
         
-        payment.status = 'activated'
-        payment.activated_at = datetime.utcnow()
+        if payment:
+            payment.status = status
+            payment.updated_at = datetime.utcnow()
+            self.db.commit()
+
+# Telegram Bot Integration
+class CryptoPaymentHandler:
+    """Handles /upgrade command and payment flow in Telegram Bot"""
+    
+    def __init__(self, payment_manager: PaymentManager, telegram_client):
+        """
+        Args:
+            payment_manager: PaymentManager instance
+            telegram_client: Telegram bot client for sending messages
+        """
+        self.payment = payment_manager
+        self.telegram = telegram_client
+    
+    async def handle_upgrade_command(self, user_id: str, telegram_id: str, plan_id: str = "pro"):
+        """
+        User runs: /upgrade
         
-        # Get user
-        user = self.db.query(User).filter(User.id == payment.user_id).first()
-        if not user:
-            logger.error(f"Cannot activate payment {payment.uuid}: user not found")
-            return
-        
-        # Upgrade subscription
+        Orchestrate the entire upgrade flow:
+        1. Create payment in Billing
+        2. Show QR code + instructions
+        3. Poll for completion
+        4. Notify user
+        """
         try:
-            result = self.sub_service.upgrade_user(
-                user_id=user.telegram_id,
-                plan_tier=payment.plan_tier,
-                billing_period=payment.billing_period,
-                payment_method='crypto',
-                payment_id=payment.uuid,
-                tx_hash=payment.tx_hash or ''
+            # Step 1: Initiate payment
+            await self.telegram.send_message(
+                telegram_id,
+                "🔄 Setting up payment...",
+                parse_mode="Markdown"
             )
             
-            self.db.commit()
-            
-            logger.info(
-                f"Subscription activated: user={user.telegram_id}, "
-                f"plan={payment.plan_tier}, tx={payment.tx_hash}"
+            checkout = await self.payment.initiate_upgrade(
+                user_id=user_id,
+                plan_id=plan_id,
+                method=PaymentMethod.USDT_ERC20
             )
             
-            # Notify user
-            if self.notification:
-                duration = '1 year' if payment.billing_period == 'yearly' else '30 days'
-                await self.notification.send_telegram(
-                    user.telegram_id,
-                    f"✅ *Payment Confirmed — {payment.plan_tier.title()} Plan Activated!*\n\n"
-                    f"💰 Amount: {payment.confirmed_amount} {payment.currency}\n"
-                    f"📅 Duration: {duration}\n"
-                    f"⏰ Expires: {result['expiry'][:10]}\n\n"
-                    f"🔗 TX: `{payment.tx_hash[:20]}...`\n\n"
-                    f"Enjoy your upgraded features! Use /help to see what's available."
+            # Step 2: Show payment instructions
+            message = (
+                f"💳 **Upgrade to Pro - $29.90/month**\n\n"
+                f"**Send exactly:**\n"
+                f"`{checkout.amount} {checkout.currency}`\n\n"
+                f"**To address:**\n"
+                f"`{checkout.address}`\n\n"
+                f"⏰ **Expires in:** {checkout.expires_minutes} minutes\n\n"
+                f"✨ **Benefits:**\n"
+                f"• 5 MT5 accounts (vs 1)\n"
+                f"• 10 webhooks (vs 3)\n"
+                f"• 500 API req/min (vs 100)\n\n"
+                f"🔗 After you send, we'll detect it automatically!\n"
+                f"Check back here for confirmation."
+            )
+            
+            await self.telegram.send_message(
+                telegram_id,
+                message,
+                parse_mode="Markdown"
+            )
+            
+            # Step 3: Monitor payment (polling)
+            async def notify(status: PaymentStatus, confirmations: int, message: str):
+                """Callback when payment status changes"""
+                await self.telegram.send_message(
+                    telegram_id,
+                    message,
+                    parse_mode="Markdown"
                 )
-                
+            
+            success = await self.payment.monitor_payment(
+                payment_id=checkout.payment_id,
+                user_id=user_id,
+                notification_callback=notify
+            )
+            
+            # Step 4: Final message
+            if success:
+                await self.telegram.send_message(
+                    telegram_id,
+                    (
+                        "🎉 **Welcome to Pro!**\n\n"
+                        "You can now:\n"
+                        "• Create 5 MT5 accounts\n"
+                        "• Set 10 webhooks\n"
+                        "• 500 API requests/min\n\n"
+                        "Run /balance to see your account info."
+                    ),
+                    parse_mode="Markdown"
+                )
+            
         except Exception as e:
-            logger.error(f"Failed to activate subscription for payment {payment.uuid}: {e}")
-            payment.status = 'failed'
-            self.db.commit()
+            logger.error(f"Error in upgrade command for {user_id}: {e}")
+            await self.telegram.send_message(
+                telegram_id,
+                f"❌ Error: {str(e)}\n\nPlease try again or contact support.",
+                parse_mode="Markdown"
+            )

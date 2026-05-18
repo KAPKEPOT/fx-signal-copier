@@ -30,7 +30,7 @@ from .decorators import (
 from .exceptions import (
     ValidationError, FormatError, ConversionError,
     FileError, NetworkError, ConfigurationError,
-    ResourceNotFoundError, PermissionDeniedError, TimeoutError
+    ResourceNotFoundError, PermissionDeniedError,  OperationTimeoutError
 )
 from .constants import (
     SECONDS_IN_MINUTE, SECONDS_IN_HOUR, SECONDS_IN_DAY, SECONDS_IN_WEEK,
@@ -118,7 +118,7 @@ __all__ = [
     'ConfigurationError',
     'ResourceNotFoundError',
     'PermissionDeniedError',
-    'TimeoutError',
+    'OperationTimeoutError',
     
     # Constants
     'SECONDS_IN_MINUTE',
